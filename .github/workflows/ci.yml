@@ -33,7 +33,7 @@ jobs:
 
     - name: Build and test
       run: |
-        $CC -o steve_test steve.h -DSTEVE_IMPLEMENTATION -DSTEVE_TEST -Wall -Werror -Wextra -Wpedantic -Wconversion
+        $CC -o steve_test steve.h -DSTEVE_IMPLEMENTATION -DSTEVE_TEST ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
         ./steve_test
 
   macos:
@@ -62,7 +62,7 @@ jobs:
 
     - name: Build and test
       run: |
-        $CC -o steve_test steve.h -DSTEVE_IMPLEMENTATION -DSTEVE_TEST -Wall -Werror -Wextra -Wpedantic -Wconversion
+        $CC -o steve_test steve.h -DSTEVE_IMPLEMENTATION -DSTEVE_TEST ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
         ./steve_test
 
   windows:
@@ -101,11 +101,11 @@ jobs:
     - name: Build and test with MSVC
       if: matrix.compiler == 'msvc'
       run: |
-        cl /Fe:steve_test.exe steve.h /DSTEVE_IMPLEMENTATION /DSTEVE_TEST /W4 /WX
+        cl /Fe:steve_test.exe steve.h /DSTEVE_IMPLEMENTATION /DSTEVE_TEST ${{ matrix.c_flags }} /W4 /WX
         .\steve_test.exe
 
     - name: Build and test with GCC/Clang
       if: matrix.compiler != 'msvc'
       run: |
-        ${{ matrix.cc }} -o steve_test.exe steve.h -DSTEVE_IMPLEMENTATION -DSTEVE_TEST -Wall -Werror -Wextra -Wpedantic -Wconversion
+        ${{ matrix.cc }} -o steve_test.exe steve.h -DSTEVE_IMPLEMENTATION -DSTEVE_TEST ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
         .\steve_test.exe
