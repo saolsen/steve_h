@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        include:
+          - compiler: gcc
+            cc: gcc
+            cxx: g++
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup compiler
+      run: |
+        echo "CC=${{ matrix.cc }}" >> $GITHUB_ENV
+        echo "CXX=${{ matrix.cxx }}" >> $GITHUB_ENV
+
+    - name: Build and test
+      run: |
+        $CC -o steve_test steve.h -DSTEVE_IMPLEMENTATION -DSTEVE_TEST -Wall -Werror -Wextra -Wpedantic -Wconversion
+        ./steve_test
+
+  macos:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        include:
+          - compiler: gcc
+            cc: gcc
+            cxx: g++
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup compiler
+      run: |
+        echo "CC=${{ matrix.cc }}" >> $GITHUB_ENV
+        echo "CXX=${{ matrix.cxx }}" >> $GITHUB_ENV
+
+    - name: Build and test
+      run: |
+        $CC -o steve_test steve.h -DSTEVE_IMPLEMENTATION -DSTEVE_TEST -Wall -Werror -Wextra -Wpedantic -Wconversion
+        ./steve_test
+
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: msvc
+            cc: cl
+          - compiler: gcc
+            cc: gcc
+          - compiler: clang
+            cc: clang
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup MSVC
+      if: matrix.compiler == 'msvc'
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Setup MinGW
+      if: matrix.compiler == 'gcc'
+      uses: egor-tensin/setup-mingw@v2
+
+    - name: Setup LLVM
+      if: matrix.compiler == 'clang'
+      uses: KyleMayes/install-llvm-action@v1
+      with:
+        version: "17.0"
+
+    - name: Build and test with MSVC
+      if: matrix.compiler == 'msvc'
+      run: |
+        cl /Fe:steve_test.exe steve.h /DSTEVE_IMPLEMENTATION /DSTEVE_TEST /W4 /WX
+        .\steve_test.exe
+
+    - name: Build and test with GCC/Clang
+      if: matrix.compiler != 'msvc'
+      run: |
+        ${{ matrix.cc }} -o steve_test.exe steve.h -DSTEVE_IMPLEMENTATION -DSTEVE_TEST -Wall -Werror -Wextra -Wpedantic -Wconversion
+        .\steve_test.exe
