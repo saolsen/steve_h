@@ -17,9 +17,11 @@ jobs:
           - compiler: gcc
             cc: gcc
             cxx: g++
+            c_flags: -std=c2x
           - compiler: clang
             cc: clang
             cxx: clang++
+            c_flags: -std=c2x
 
     steps:
     - uses: actions/checkout@v4
@@ -44,9 +46,11 @@ jobs:
           - compiler: gcc
             cc: gcc
             cxx: g++
+            c_flags: -std=c2x
           - compiler: clang
             cc: clang
             cxx: clang++
+            c_flags: -std=c2x
 
     steps:
     - uses: actions/checkout@v4
@@ -69,10 +73,13 @@ jobs:
         include:
           - compiler: msvc
             cc: cl
+            c_flags: /std:c23
           - compiler: gcc
             cc: gcc
+            c_flags: -std=c2x
           - compiler: clang
             cc: clang
+            c_flags: -std=c2x
 
     steps:
     - uses: actions/checkout@v4
