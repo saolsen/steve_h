@@ -295,6 +295,7 @@ struct Pool {
 
 #ifdef _WIN32
     #include <Windows.h>
+    // todo(steve): Can I set a pragma or whatever to link kernal32.lib?
 #else
     #include <unistd.h>
     #include <sys/mman.h>
