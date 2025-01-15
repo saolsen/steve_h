@@ -22,7 +22,7 @@ BraceWrapping:
   AfterClass: false
 
 # Pointers/references
-PointerAlignment: Right   # e.g. "int* ptr" instead of "int *ptr"
+PointerAlignment: Right
 
 # Spacing
 SpaceAfterCStyleCast: false
@@ -30,6 +30,5 @@ SpaceAfterCStyleCast: false
 # Misc
 AlignTrailingComments: true
 AllowShortFunctionsOnASingleLine: Empty
-AllowShortIfStatementsOnASingleLine: Never
-SortIncludes: false       # Keep includes in the order they appear rather than sorting them.
+SortIncludes: true
 IndentCaseLabels: false   # Keep 'case' labels aligned with 'switch'.

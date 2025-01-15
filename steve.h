@@ -46,8 +46,8 @@
 #define STEVE_H
 // NOLINTBEGIN(modernize-use-nullptr)
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 // @todo(steve): Clean up this block.
 // * Make it more obvious which compilers and c versions are supported.
@@ -360,17 +360,17 @@ struct Pool {
 // NOLINTBEGIN(modernize-use-nullptr)
 
 #include <assert.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 
 #ifdef _WIN32
 #include <Windows.h>
 // todo(steve): Can I set a pragma or whatever to link kernal32.lib?
 #else
-#include <unistd.h>
 #include <sys/mman.h>
+#include <unistd.h>
 #endif
 
 void *xmemcpy(void *dest, const void *src, ptrdiff_t n) {
