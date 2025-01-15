@@ -111,5 +111,6 @@ jobs:
     - name: Build and test with GCC/Clang
       if: matrix.compiler != 'msvc'
       run: |
+        ${{ matrix.cc }} --version
         ${{ matrix.cc }} -o test_steve.exe test_steve.c ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
         .\test_steve.exe
