@@ -82,7 +82,7 @@ static_assert(sizeof(Arena) % 16 == 0);
 
 // Pool of already allocated arenas that aren't in use. This lets us reuse arenas for small (temp/scratch) allocations
 // without having to pass them around or pay the cost of allocating a new one each time.
-thread_local static Arena *arena__free_list = nullptr;
+thread_local static Arena *arena__free_list = NULL;
 
 Arena *arena_acquire();
 void arena_reset(Arena *arena);
@@ -339,7 +339,7 @@ void arena_free_all() {
         arena_free(arena);
         arena = next;
     }
-    arena__free_list = nullptr;
+    arena__free_list = NULL;
 }
 
 uint8_t* arena_alloc_size(Arena* arena, ptrdiff_t size, ptrdiff_t align) {
@@ -398,7 +398,7 @@ U8Array *arena__alloc_array(Arena *arena, ptrdiff_t item_size, ptrdiff_t cap) {
 }
 
 U8Array *arena__grow_array(Arena *arena, U8Array *array, ptrdiff_t item_size, ptrdiff_t amount) {
-    if (array == nullptr) {
+    if (array == NULL) {
         return arena__alloc_array(arena, item_size, MAX(4, amount));
     }
     ptrdiff_t new_cap = MAX(array->cap, 4);
@@ -442,7 +442,7 @@ String format(Arena *a, const char *fmt, ...) {
     va_start(args, fmt);
     va_list args_copy;
     va_copy(args_copy, args);
-    ptrdiff_t len = vsnprintf(nullptr, 0, fmt, args_copy);
+    ptrdiff_t len = vsnprintf(NULL, 0, fmt, args_copy);
     va_end(args_copy);
     char *c = (char*) arena_alloc_size(a, len + 1, _Alignof(char));
     vsnprintf(c, (size_t)len + 1, fmt, args);
@@ -453,7 +453,7 @@ String format(Arena *a, const char *fmt, ...) {
 StringSlice str_split(Arena *a, String s, char sep) {
     // Skip leading separators.
     int i=0;
-    StringArray *parts = nullptr;
+    StringArray *parts = NULL;
     while(i < s.len) {
         int start = i;
         while(i < s.len && s.e[i] != sep) {
@@ -467,8 +467,8 @@ StringSlice str_split(Arena *a, String s, char sep) {
             i++;
         }
     }
-    if (parts == nullptr) {
-        return (StringSlice){ .len = 0, .e = nullptr };
+    if (parts == NULL) {
+        return (StringSlice){ .len = 0, .e = NULL };
     }
     StringSlice result = arr_slice(parts);
     return result;
@@ -678,7 +678,7 @@ static void test_slices() {
 
     // Create an array
     typedef Array(int) IntArray;
-    IntArray *arr = nullptr;
+    IntArray *arr = NULL;
     for (int i=0; i<5; i++) {
         arr_push(a, arr, i*10);
     }
@@ -713,7 +713,7 @@ static void test_rel_slices() {
 
     // Create an array
     typedef Array(int) IntArray;
-    IntArray *arr = nullptr;
+    IntArray *arr = NULL;
     for (int i=0; i<5; i++) {
         arr_push(a, arr, i*10);
     }
@@ -753,7 +753,7 @@ static void test_dynamic_arrays() {
     assert(arr->cap == 15);
 
     // 1. Push elements
-    arr = nullptr;
+    arr = NULL;
     for (int i=0; i<10; i++) {
         arr_push(a, arr, i);
         assert(arr->len == i+1);
@@ -802,7 +802,7 @@ static void test_arena_serialize() {
     Arena *a = arena_acquire();
     typedef Array(int) IntArray;
     typedef Slice(int) IntSlice;
-    IntArray *arr = nullptr;
+    IntArray *arr = NULL;
     for (int i=0; i<10; i++) {
         arr_push(a, arr, i*10);
     }
