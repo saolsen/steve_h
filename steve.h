@@ -27,6 +27,20 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202302L)
+    #define STATIC_ASSERT(exp) static_assert(exp)
+    #define THREAD_LOCAL_STATIC thread_local static
+#elif defined(_MSC_VER)
+    #define THREAD_LOCAL_STATIC __declspec(thread)
+    #define STATIC_ASSERT(expr, msg) // @todo(steve): figure out how to do this on msvc
+#elif defined(__GNUC__) || defined(__clang__)
+    #include <assert.h>
+    #include <stdbool.h>
+    #define STATIC_ASSERT(exp) _Static_assert(exp, #exp)
+    #define THREAD_LOCAL_STATIC static __thread
+#else
+    #error "Unsupported Compiler"
+#endif
 
 #define MIN(x, y) ((x) <= (y) ? (x) : (y))
 #define MAX(x, y) ((x) >= (y) ? (x) : (y))
@@ -66,7 +80,7 @@ void* xmemcpy(void *dest, const void *src, ptrdiff_t n);
 //   and for temporary allocations within a function.
 // * Arenas are not thread safe so multiple threads should not use the same arena at the same time.
 // * This only works on 64 bit systems where pointers are 64 bits.
-static_assert(sizeof(uintptr_t) == 8);
+STATIC_ASSERT(sizeof(uintptr_t) == 8);
 
 typedef struct Arena Arena;
 struct Arena {
@@ -80,20 +94,20 @@ struct Arena {
 // * We want this begin to be aligned to 16 bytes so common things like an array (which is always
 //   aligned to 16 bytes here) can be allocated at the start of the arena.
 // * Arena happens to be 4 pointers so this works well, static assert here to catch if that changes.
-static_assert(sizeof(Arena) % 16 == 0);
+STATIC_ASSERT(sizeof(Arena) % 16 == 0);
 
 // Pool of already allocated arenas that aren't in use. This lets us reuse arenas for small (temp/scratch) allocations
 // without having to pass them around or pay the cost of allocating a new one each time.
-thread_local static Arena *arena__free_list = NULL;
+THREAD_LOCAL_STATIC Arena *arena__free_list = NULL;
 
-Arena *arena_acquire();
+Arena *arena_acquire(void);
 void arena_reset(Arena *arena);
 void arena_release(Arena *arena);
 void arena_free(Arena *arena);
 
 // Release all the arenas in the pool.
 // Not really something you'd use in a real program but useful for testing.
-void arena_free_all();
+void arena_free_all(void);
 
 #define arena_alloc(arena, type) (type*)arena_alloc_size(arena, (ptrdiff_t)sizeof(type), _Alignof(type))
 uint8_t* arena_alloc_size(Arena* arena, ptrdiff_t size, ptrdiff_t align);
@@ -157,7 +171,7 @@ uint8_t *arena__clone_slice(Arena *arena, U8Slice *slice, ptrdiff_t item_size);
 // * It's a polymorphic type so you typically typedef it to specific types.
 //     eg: typedef Array(uint8_t) U8Array;
 // * Since the type is polymorphic, most of the helper functions are macros.
-#define Array(T) struct { ptrdiff_t len; ptrdiff_t cap; alignas(16) T e[]; }
+#define Array(T) struct { ptrdiff_t len; ptrdiff_t cap; T e[]; }
 
 typedef Array(uint8_t) U8Array;
 
@@ -283,7 +297,7 @@ void* xmemcpy(void *dest, const void *src, ptrdiff_t n) {
     return memcpy(dest, src, (size_t)n);
 }
 
-Arena *arena_acquire() {
+Arena *arena_acquire(void) {
     if (arena__free_list) {
         Arena *arena = arena__free_list;
         arena__free_list = arena->next_free;
@@ -336,7 +350,7 @@ void arena_free(Arena *arena) {
     }
 }
 
-void arena_free_all() {
+void arena_free_all(void) {
     Arena *arena = arena__free_list;
     while (arena) {
         Arena *next = arena->next_free;
@@ -488,18 +502,18 @@ StringSlice str_split(Arena *a, String s, char sep) {
 #include <stdio.h>
 #include <string.h>
 
-static void test_helpers();
-static void test_arena_acquire_release();
-static void test_arena_reset();
-static void test_arena_free();
-static void test_arena_alloc_alignment();
-static void test_arena_large_alloc();
-static void test_rel_ptr();
-static void test_slices();
-static void test_rel_slices();
-static void test_dynamic_arrays();
-static void test_arena_serialize();
-static void test_strings();
+static void test_helpers(void);
+static void test_arena_acquire_release(void);
+static void test_arena_reset(void);
+static void test_arena_free(void);
+static void test_arena_alloc_alignment(void);
+static void test_arena_large_alloc(void);
+static void test_rel_ptr(void);
+static void test_slices(void);
+static void test_rel_slices(void);
+static void test_dynamic_arrays(void);
+static void test_arena_serialize(void);
+static void test_strings(void);
 
 int main(void) {
     test_helpers();
@@ -519,7 +533,7 @@ int main(void) {
     return 0;
 }
 
-static void test_helpers() {
+static void test_helpers(void) {
     assert(pow2_next(0) == 0);
     assert(pow2_next(1) == 1);
     assert(pow2_next(2) == 2);
@@ -572,7 +586,7 @@ static void test_helpers() {
 
 }
 
-static void test_arena_acquire_release() {
+static void test_arena_acquire_release(void) {
     // Acquire a single arena and release it
     Arena *a = arena_acquire();
     assert(a != NULL);
@@ -592,7 +606,7 @@ static void test_arena_acquire_release() {
     arena_free_all();
 }
 
-static void test_arena_reset() {
+static void test_arena_reset(void) {
     Arena *a = arena_acquire();
     // Allocate some memory
     int *x = arena_alloc(a, int);
@@ -614,7 +628,7 @@ static void test_arena_reset() {
     arena_free_all();
 }
 
-static void test_arena_free() {
+static void test_arena_free(void) {
     Arena *a = arena_acquire();
     int *x = arena_alloc(a, int);
     *x = 123;
@@ -633,7 +647,7 @@ static void test_arena_free() {
     arena_free_all();
 }
 
-static void test_arena_alloc_alignment() {
+static void test_arena_alloc_alignment(void) {
     Arena *a = arena_acquire();
 
     // Test alignment for 1, 2, 4, 16
@@ -652,7 +666,7 @@ static void test_arena_alloc_alignment() {
     arena_free_all();
 }
 
-static void test_arena_large_alloc() {
+static void test_arena_large_alloc(void) {
     Arena *a = arena_acquire();
     ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE);
     ptrdiff_t big_size = pagesize * 5;
@@ -665,7 +679,7 @@ static void test_arena_large_alloc() {
     arena_free_all();
 }
 
-static void test_rel_ptr() {
+static void test_rel_ptr(void) {
     Arena *a = arena_acquire();
     int *x = arena_alloc(a, int);
     *x = 55;
@@ -678,7 +692,7 @@ static void test_rel_ptr() {
     arena_free_all();
 }
 
-static void test_slices() {
+static void test_slices(void) {
     Arena *a = arena_acquire();
 
     // Create an array
@@ -713,7 +727,7 @@ static void test_slices() {
     arena_free_all();
 }
 
-static void test_rel_slices() {
+static void test_rel_slices(void) {
     Arena *a = arena_acquire();
 
     // Create an array
@@ -746,7 +760,7 @@ static void test_rel_slices() {
     arena_free_all();
 }
 
-static void test_dynamic_arrays() {
+static void test_dynamic_arrays(void) {
     typedef Array(int) IntArray;
     typedef Slice(int) IntSlice;
 
@@ -757,7 +771,7 @@ static void test_dynamic_arrays() {
     assert(arr->len == 0);
     assert(arr->cap == 15);
 
-    // 1. Push elements
+    // Push elements
     arr = NULL;
     for (int i=0; i<10; i++) {
         arr_push(a, arr, i);
@@ -767,14 +781,14 @@ static void test_dynamic_arrays() {
         }
     }
 
-    // 2. Force reallocation
-    // The library starts with capacity=4 (by default) if we push many items, we ensure multiple grows
+    // Force reallocation
+    // The library starts with capacity=4 if we push many items, we ensure multiple grows.
     for (int i=0; i<100; i++) {
         arr_push(a, arr, i + 100);
     }
     assert(arr->len == 110);
 
-    // 3. arr_push_slice
+    // arr_push_slice
     IntSlice slice = { .len = 3, .e = (int[]){999, 1000, 1001} };
     arr_push_slice(a, arr, slice);
     assert(arr->len == 113);
@@ -782,14 +796,14 @@ static void test_dynamic_arrays() {
     assert(arr->e[111] == 1000);
     assert(arr->e[112] == 1001);
 
-    // 4. setlen test
-    // length that puts us on a new page so that we know it worked if we can write to the end.
+    // setlen
+    // Length that puts us on a new page so that we know it worked if we can write to the end.
     ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE);
     arr_setlen(a, arr, pagesize+200);
     assert(arr->len == pagesize+200);
     arr->e[pagesize+199] = 1234;
 
-    // 5. clone_array
+    // clone_array
     Arena *a2 = arena_acquire();
     IntArray *clone = arena_clone_arr(a2, arr);
     assert(clone->len == arr->len);
@@ -802,7 +816,7 @@ static void test_dynamic_arrays() {
     arena_free_all();
 }
 
-static void test_arena_serialize() {
+static void test_arena_serialize(void) {
     // @todo(steve): Test relative pointers and relative slices here.
     Arena *a = arena_acquire();
     typedef Array(int) IntArray;
@@ -859,7 +873,7 @@ static void test_arena_serialize() {
     arena_free_all();
 }
 
-static void test_strings() {
+static void test_strings(void) {
     Arena *a = arena_acquire();
 
     // format
