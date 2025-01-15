@@ -4,17 +4,20 @@
 //   @todo: support mingw64, clang and msvc on windows.
 //   @todo: support and test on cosmocc.
 //
-// * Maintains a (thread local) pool of arenas so they are cheap to acquire and release for temporary allocations.
+// * Maintains a (thread local) pool of arenas so they are cheap to acquire and release for
+//   temporary allocations.
 //   Since all allocations are backed by arenas you don't have to free anything individually, just
 //   use an arena that matches the lifetime of the data.
 // * Includes data structures like a dynamic array that work well with the arena.
-//   * Allows for some optimizations like extending instead of reallocing if the array is on the end of an arena.
+//   * Allows for some optimizations like extending instead of reallocing if the array is on the end
+//   of an arena.
 // * All lengths are signed.
 //   * Makes for less casting when comparing lengths and pointers.
 //   * If compiling with -Wconversion you probably have to cast to size_t to call stdlib stuff.
 
 // * Rules of thumb.
-//   * If a function returns something that needs to be allocated, it should take an arena to allocate the result on.
+//   * If a function returns something that needs to be allocated, it should take an arena to
+//   allocate the result on.
 //   * You should never return something allocated on an arena that wasn't passed in.
 //   * If a function needs to allocate temporary memory,
 //     it should acquire its own arena and release it before returning.
@@ -25,8 +28,10 @@
 //   * Handles
 
 // * Other Ideas
-//   * Debug print macros that print to stdout on posix and the debug console on windows (for viewing in raddbg)
-//   * Helpers to draw stuff with sixel, supported in windows terminal now so cross platform as far as this lib cares.
+//   * Debug print macros that print to stdout on posix and the debug console on windows (for
+//     viewing in raddbg)
+//   * Helpers to draw stuff with sixel, supported in windows terminal now so cross platform as far
+//     as this lib cares.
 //   * A debug mode that tracks memory usage.
 //   * Helpers to view these data structures in the debugger.
 //     * @note(steve): in clion, you can view a pointer as an array like this.
@@ -66,18 +71,18 @@
 //     eg: STEVE_MACOS_CLANG_C23
 //   I can maybe look at other projects like sdl to see how they do this.
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202302L)
-    #define STATIC_ASSERT(exp) static_assert(exp)
-    #define THREAD_LOCAL_STATIC thread_local static
+#define STATIC_ASSERT(exp) static_assert(exp)
+#define THREAD_LOCAL_STATIC thread_local static
 #elif defined(__GNUC__) || defined(__clang__)
-    #include <assert.h>
-    #include <stdbool.h>
-    #define STATIC_ASSERT(exp) _Static_assert(exp, #exp)
-    #define THREAD_LOCAL_STATIC static __thread
+#include <assert.h>
+#include <stdbool.h>
+#define STATIC_ASSERT(exp) _Static_assert(exp, #exp)
+#define THREAD_LOCAL_STATIC static __thread
 #elif defined(_MSC_VER)
-    #define THREAD_LOCAL_STATIC __declspec(thread)
-    #define STATIC_ASSERT(exp) static_assert(exp, #exp)
+#define THREAD_LOCAL_STATIC __declspec(thread)
+#define STATIC_ASSERT(exp) static_assert(exp, #exp)
 #else
-    #error "Unsupported Compiler"
+#error "Unsupported Compiler"
 #endif
 
 #define MIN(x, y) ((x) <= (y) ? (x) : (y))
@@ -85,13 +90,15 @@
 #define CLAMP_MAX(x, max) MIN(x, max)
 #define CLAMP_MIN(x, min) MAX(x, min)
 #define IS_POW2(x) (((x) != 0) && ((x) & ((x)-1)) == 0)
-#define ALIGN_DOWN(n, a) ((n) & ~((a) - 1))
-#define ALIGN_UP(n, a) ALIGN_DOWN((n) + (a) - 1, (a))
+#define ALIGN_DOWN(n, a) ((n) & ~((a)-1))
+#define ALIGN_UP(n, a) ALIGN_DOWN((n) + (a)-1, (a))
 #define ALIGN_DOWN_PTR(p, a) ((void *)ALIGN_DOWN((ptrdiff_t)(p), (a)))
 #define ALIGN_UP_PTR(p, a) ((void *)ALIGN_UP((ptrdiff_t)(p), (a)))
 
 uint64_t pow2_next(uint64_t i) {
-    if (i == 0) return 0;
+    if (i == 0) {
+        return 0;
+    }
     i--;
     i |= i >> 1;
     i |= i >> 2;
@@ -105,7 +112,7 @@ uint64_t pow2_next(uint64_t i) {
 
 // memcpy wrapper so we don't have to include sting.h in the header.
 // @todo(steve): Tie in with future error handling.
-void* xmemcpy(void *dest, const void *src, ptrdiff_t n);
+void *xmemcpy(void *dest, const void *src, ptrdiff_t n);
 
 // Arena
 // * An arena is a continuous block of memory that can grow up to a certain size.
@@ -134,8 +141,9 @@ struct Arena {
 // * Arena happens to be 4 pointers so this works well, static assert here to catch if that changes.
 STATIC_ASSERT(sizeof(Arena) % 16 == 0);
 
-// Pool of already allocated arenas that aren't in use. This lets us reuse arenas for small (temp/scratch) allocations
-// without having to pass them around or pay the cost of allocating a new one each time.
+// Pool of already allocated arenas that aren't in use. This lets us reuse arenas for small
+// (temp/scratch) allocations without having to pass them around or pay the cost of allocating a new
+// one each time.
 THREAD_LOCAL_STATIC Arena *arena__free_list = NULL;
 
 Arena *arena_acquire(void);
@@ -147,8 +155,9 @@ void arena_free(Arena *arena);
 // Not really something you'd use in a real program but useful for testing.
 void arena_free_all(void);
 
-#define arena_alloc(arena, type) (type*)arena_alloc_size(arena, (ptrdiff_t)sizeof(type), _Alignof(type))
-uint8_t* arena_alloc_size(Arena* arena, ptrdiff_t size, ptrdiff_t align);
+#define arena_alloc(arena, type)                                                                   \
+    (type *)arena_alloc_size(arena, (ptrdiff_t)sizeof(type), _Alignof(type))
+uint8_t *arena_alloc_size(Arena *arena, ptrdiff_t size, ptrdiff_t align);
 
 // Get the size of the arena (not including the arena struct itself).
 ptrdiff_t arena_size(Arena *arena);
@@ -163,38 +172,51 @@ void arena_deserialize(Arena *arena, void *buf, ptrdiff_t size);
 // Note that dest comes first which matches the order arena_serialize and memcpy use.
 void arena_clone(Arena *dest, Arena *src);
 
-// * It's nice to use relative pointers (offsets from the beginning of the arena) in data structures on an arena.
-//   If you store offsets instead of pointers in all the data structures in an arena, and they all only
-//   point to other things in the arena, you should use relative pointers if you want to take advantage
-//   of the arena_serialize and arena_deserialize.
-// * Since the type of the offset is always ptrdiff_t you can't know what this is pointing at from the type.
-//   This is annoying, you have to know what it's pointing at from the context.
+// * It's nice to use relative pointers (offsets from the beginning of the arena) in data structures
+//   on an arena.
+// * If you store offsets instead of pointers in all the data structures in an arena, and they all
+//   only point to other things in the arena, you should use relative pointers if you want to take
+//   advantage of the arena_serialize and arena_deserialize.
+// * Since the type of the offset is always ptrdiff_t you can't know what this is pointing at from
+//   the type.
+// * This is annoying, you have to know what it's pointing at from the context.
 //   @todo(steve): Is there a better way to do this in c that doesn't suck?
 #define rel(arena, ptr) ((ptrdiff_t)(ptr) - (ptrdiff_t)(arena)->begin)
-#define ptr(arena, off) (void*)((ptrdiff_t)(arena)->begin + (off))
+#define ptr(arena, off) (void *)((ptrdiff_t)(arena)->begin + (off))
 
 // Slice
 // * A slice is a pointer and a length. It's a view into an array.
 // * It's a polymorphic type so you typically typedef it to specific types.
 //     eg: typedef Slice(uint8_t) U8Slice;
-#define Slice(T) struct { ptrdiff_t len; T *e; }
+#define Slice(T)                                                                                   \
+    struct {                                                                                       \
+        ptrdiff_t len;                                                                             \
+        T *e;                                                                                      \
+    }
 
 typedef Slice(uint8_t) U8Slice;
 
 // * If the slice is a view into data on an arena, and it's stored in a data structure in the arena,
 //   it's better to store a relative slice so the arena can be serialized and deserialized.
-// * Since the type of the offset is always ptrdiff_t you can't know what this is pointing at from the type.
+// * Since the type of the offset is always ptrdiff_t you can't know what this is pointing at from
+//   the type.
 //   This is annoying, you have to know what it's pointing at from the context.
 //   @todo(steve): Is there a better way to do this in c that doesn't suck?
-typedef struct { ptrdiff_t len; ptrdiff_t e; } RelSlice;
+typedef struct {
+    ptrdiff_t len;
+    ptrdiff_t e;
+} RelSlice;
 
-#define slice_rel(arena, ptr_slice) { .len = (ptr_slice).len, .e = rel(arena, (ptr_slice).e) }
-#define slice_ptr(arena, rel_slice) { .len = (rel_slice).len, .e = ptr(arena, (rel_slice).e) }
+#define slice_rel(arena, ptr_slice)                                                                \
+    { .len = (ptr_slice).len, .e = rel(arena, (ptr_slice).e) }
+#define slice_ptr(arena, rel_slice)                                                                \
+    { .len = (rel_slice).len, .e = ptr(arena, (rel_slice).e) }
 
-#define arena_clone_slice(arena, slice) {                                                                  \
-    .len = (slice).len,                                                                                    \
-    .e = (typeof((slice).e))arena__clone_slice(arena, (U8Slice*)&(slice), (ptrdiff_t)sizeof(*((slice).e))) \
-}
+#define arena_clone_slice(arena, slice)                                                            \
+    {                                                                                              \
+        .len = (slice).len, .e = (typeof((slice).e))arena__clone_slice(                            \
+                                arena, (U8Slice *)&(slice), (ptrdiff_t)sizeof(*((slice).e)))       \
+    }
 uint8_t *arena__clone_slice(Arena *arena, U8Slice *slice, ptrdiff_t item_size);
 
 // Array
@@ -203,87 +225,102 @@ uint8_t *arena__clone_slice(Arena *arena, U8Slice *slice, ptrdiff_t item_size);
 // * An array can be resized with helpers like append or setlen.
 //   If the new size is > the capacity it will reallocate the data (or extend the data
 //   allocation if the array is at the end of the arena).
-// * There is no internal pointer in the array struct, so it works when referenced by other data structures
+// * There is no internal pointer in the array struct, so it works when referenced by other data
+// structures
 //   on the arena using relative pointers.
 //   (of course if it reallocs it will move so you'll have to update the reference).
 // * It's a polymorphic type so you typically typedef it to specific types.
 //     eg: typedef Array(uint8_t) U8Array;
 // * Since the type is polymorphic, most of the helper functions are macros.
-#define Array(T) struct { ptrdiff_t len; ptrdiff_t cap; T e[]; }
+#define Array(T)                                                                                   \
+    struct {                                                                                       \
+        ptrdiff_t len;                                                                             \
+        ptrdiff_t cap;                                                                             \
+        T e[];                                                                                     \
+    }
 
 typedef Array(uint8_t) U8Array;
 
-#define arena_alloc_array(arena, type, item_type, cap) \
-    (type*)arena__alloc_array(arena, (ptrdiff_t)sizeof(item_type), cap)
+#define arena_alloc_array(arena, type, item_type, cap)                                             \
+    (type *)arena__alloc_array(arena, (ptrdiff_t)sizeof(item_type), cap)
 U8Array *arena__alloc_array(Arena *arena, ptrdiff_t item_size, ptrdiff_t cap);
 U8Array *arena__grow_array(Arena *arena, U8Array *array, ptrdiff_t item_size, ptrdiff_t amount);
 
-#define arr_push(arena, array, val)   arr__maybegrow(arena, array, 1); (array)->e[(array)->len++] = (val)
-#define arr_push_array(arena, array, val)                                                        \
-    arr__maybegrow(arena, array, (val)->len);                                                    \
-    (                                                                                            \
-      xmemcpy(&(array)->e[(array)->len], (val)->e, (val)->len * (ptrdiff_t)sizeof((val)->e[0])), \
-      (array)->len += (val)->len                                                                 \
-    )
-#define arr_push_slice(arena, array, slice)                                                         \
-    arr__maybegrow(arena, array, (slice).len);                                                      \
-    (                                                                                               \
-      xmemcpy(&(array)->e[(array)->len], (slice).e, (slice).len * (ptrdiff_t)sizeof((slice).e[0])), \
-      (array)->len += (slice).len                                                                   \
-    )
-#define arr_setlen(arena, array, n)                                    \
-    assert(n > 0);                                                     \
-    arr__maybegrow(arena, array, !(array) ? (n) : (n) - (array)->len); \
+#define arr_push(arena, array, val)                                                                \
+    arr__maybegrow(arena, array, 1);                                                               \
+    (array)->e[(array)->len++] = (val)
+#define arr_push_array(arena, array, val)                                                          \
+    arr__maybegrow(arena, array, (val)->len);                                                      \
+    (xmemcpy(&(array)->e[(array)->len], (val)->e, (val)->len * (ptrdiff_t)sizeof((val)->e[0])),    \
+     (array)->len += (val)->len)
+#define arr_push_slice(arena, array, slice)                                                        \
+    arr__maybegrow(arena, array, (slice).len);                                                     \
+    (xmemcpy(&(array)->e[(array)->len], (slice).e, (slice).len * (ptrdiff_t)sizeof((slice).e[0])), \
+     (array)->len += (slice).len)
+#define arr_setlen(arena, array, n)                                                                \
+    assert(n > 0);                                                                                 \
+    arr__maybegrow(arena, array, !(array) ? (n) : (n) - (array)->len);                             \
     (array)->len = (n)
-#define arr_slice(array) {.len = (array)->len, .e = (array)->e}
+#define arr_slice(array)                                                                           \
+    { .len = (array)->len, .e = (array)->e }
 
 // This isn't strictly necessary for the array or arena arguments.
 // * For array, you wouldn't push to the result of a function call,
 //   That would just throw away the result.
 //     eg: arr_push(arena, get_array(), 1);
-// * For arena, it'd be bad to pass arena_acquire() because you'd lose the arena reference and leak the whole thing.
+// * For arena, it'd be bad to pass arena_acquire() because you'd lose the arena reference and leak
+//   the whole thing.
 //     eg: arr_push(arena_acquire(), a, 1);
 // * It is however important for the n argument in case it's something like ++i
 //   In that case we don't want to evaluate it twice.
-#define arr__maybegrow(arena, array, n)                                                                                \
-    do {                                                                                                               \
-        Arena *_arena = (arena);                                                                                       \
-        typeof(array) _array = (array);                                                                                \
-        ptrdiff_t _n = (n);                                                                                            \
-        if (!_array || _array->len + _n > _array->cap) {                                                               \
-            _array = (typeof(_array))arena__grow_array(_arena, (U8Array*)_array, (ptrdiff_t)sizeof(_array->e[0]), _n); \
-            (array) = _array;                                                                                          \
-        }                                                                                                              \
+#define arr__maybegrow(arena, array, n)                                                            \
+    do {                                                                                           \
+        Arena *_arena = (arena);                                                                   \
+        typeof(array) _array = (array);                                                            \
+        ptrdiff_t _n = (n);                                                                        \
+        if (!_array || _array->len + _n > _array->cap) {                                           \
+            _array = (typeof(_array))arena__grow_array(_arena, (U8Array *)_array,                  \
+                                                       (ptrdiff_t)sizeof(_array->e[0]), _n);       \
+            (array) = _array;                                                                      \
+        }                                                                                          \
     } while (0)
 
-#define arena_clone_arr(arena, array) \
-    (typeof(array))arena__clone_arr(arena, (U8Array*)(array), (ptrdiff_t)sizeof((array)->e[0]))
+#define arena_clone_arr(arena, array)                                                              \
+    (typeof(array))arena__clone_arr(arena, (U8Array *)(array), (ptrdiff_t)sizeof((array)->e[0]))
 U8Array *arena__clone_arr(Arena *arena, U8Array *array, ptrdiff_t item_size);
 
 // Notes on Array vs Slice
 // * An array contains the array data, so it's a buffer with metadata. The buffer is almost always
 //   in the arena so you typically have pointers to arrays.
-// * A slice is a pointer with some metadata. That makes it a fancy pointer so you usually use it as a value
+// * A slice is a pointer with some metadata. That makes it a fancy pointer so you usually use it as
+// a value
 //   rather than a pointer to a slice.
-// * Many times you'd want to pass an array to a function that takes a slice. Use the slice macro to do that.
+// * Many times you'd want to pass an array to a function that takes a slice. Use the slice macro to
+//   do that.
 // * You can't alter slices, so these functions treat them as const.
 //   * There's no slice -> array converter
-//     * There's no guarantees about where the data the slice points to is stored so you don't want to modify it.
+//     * There's no guarantees about where the data the slice points to is stored so you don't want
+//     to modify it.
 //     * If you want to pass an array and use it as an array, just pass an array pointer.
-//     * If you want to create an array from a slice (by copying the data), you can use arena_push_slice.
+//     * If you want to create an array from a slice (by copying the data), you can use
+//     arena_push_slice.
 
 // A String is a slice of characters.
-// * It's length doesn't include a null terminator and there's no guarantee that there is a null terminator.
-//   * When it's a view into another string like in a parser or something, there definitely won't be one.
-//   * If it's allocated in an arena with one of the functions here, there usually is a null terminator,
-//     because it's easier to inspect in the debugger. But this is not a property you can rely on in code!
-// * To pass to stdlib and other functions that expect a null terminated string, you can use the cstr macro.
+// * It's length doesn't include a null terminator and there's no guarantee that there is a null
+//   terminator.
+//   * When it's a view into another string like in a parser or something, there definitely won't be
+//   one.
+//   * If it's allocated in an arena with one of the functions here, there usually is a null
+//   terminator, because it's easier to inspect in the debugger. But this is not a property you can
+//   rely on in code!
+// * To pass to stdlib and other functions that expect a null terminated string, you can use the
+//   cstr macro.
 //   * It will allocate a new buffer in the arena with a null terminator.
 //     @opt(steve): Don't allocate if the String already has a null terminator.
 // * To get a String view of a c string, use the str macro.
 typedef Slice(char) String;
 
-#define str(c_string) ((String){ .len = strlen(c_string), .e = c_string })
+#define str(c_string) ((String){.len = strlen(c_string), .e = c_string})
 #define cstr(a, s) arena__alloc_cstring((a), (s))
 
 typedef Array(String) StringArray;
@@ -317,7 +354,7 @@ struct Pool {
 #endif
 
 // NOLINTEND(modernize-use-nullptr)
-#endif //STEVE_H
+#endif // STEVE_H
 
 #ifdef STEVE_IMPLEMENTATION
 // NOLINTBEGIN(modernize-use-nullptr)
@@ -329,14 +366,14 @@ struct Pool {
 #include <stdarg.h>
 
 #ifdef _WIN32
-    #include <Windows.h>
-    // todo(steve): Can I set a pragma or whatever to link kernal32.lib?
+#include <Windows.h>
+// todo(steve): Can I set a pragma or whatever to link kernal32.lib?
 #else
-    #include <unistd.h>
-    #include <sys/mman.h>
+#include <unistd.h>
+#include <sys/mman.h>
 #endif
 
-void* xmemcpy(void *dest, const void *src, ptrdiff_t n) {
+void *xmemcpy(void *dest, const void *src, ptrdiff_t n) {
     assert(n >= 0);
     return memcpy(dest, src, (size_t)n);
 }
@@ -349,28 +386,29 @@ Arena *arena_acquire(void) {
     }
 
     // Allocate a new arena.
-    ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE);   // 16kb on my machine.
+    ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE); // 16kb on my machine.
     assert(pagesize >= 0);
-    ptrdiff_t cap = pagesize * 4 * 1024 * 1024;  // 64GB on my machine. @note(steve): probably way too much
+    ptrdiff_t cap =
+        pagesize * 4 * 1024 * 1024; // 64GB on my machine. @note(steve): probably way too much
     assert(cap >= 0);
     // todo(steve): windows
     // VirtualAlloc(null, size, MEM_RESERVE, PAGE_READWRITE);
-    void *r = mmap(NULL, (size_t)cap, PROT_NONE, MAP_ANON|MAP_PRIVATE, -1, 0);
+    void *r = mmap(NULL, (size_t)cap, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (r == MAP_FAILED) {
         perror("mmap");
         exit(1);
     }
     // commit first page
-    // todo(steve): windows
+    // @todo(steve): windows
     // VirtualAlloc(first_uncommitted_page, size, MEM_COMMIT, PAGE_READWRITE);
-    if (mprotect(r, (size_t)pagesize, PROT_READ|PROT_WRITE) == -1) {
+    if (mprotect(r, (size_t)pagesize, PROT_READ | PROT_WRITE) == -1) {
         perror("Ran out of virtual memory");
         exit(1);
     }
     Arena *arena = (Arena *)r;
-    arena->begin = (uint8_t*)(r);
-    arena->pos = (uint8_t*)(r) + sizeof(*arena);
-    arena->commit = (uint8_t*)(r) + pagesize;
+    arena->begin = (uint8_t *)(r);
+    arena->pos = (uint8_t *)(r) + sizeof(*arena);
+    arena->commit = (uint8_t *)(r) + pagesize;
     return arena;
 }
 
@@ -379,10 +417,10 @@ void arena_reset(Arena *arena) {
 }
 
 void arena_release(Arena *arena) {
-    // opt(steve): If we have a lot of pages committed, we could free it
+    // @opt(steve): If we have a lot of pages committed, we could free it
     //   and then create a new virtual allocation the next time it's used.
     //   On windows, you can "uncommit" pages but not on posix.
-    // todo(steve): windows
+    // @todo(steve): windows
     //
     arena_reset(arena);
     arena->next_free = arena__free_list;
@@ -410,9 +448,9 @@ void arena_free_all(void) {
     arena__free_list = NULL;
 }
 
-uint8_t* arena_alloc_size(Arena* arena, ptrdiff_t size, ptrdiff_t align) {
+uint8_t *arena_alloc_size(Arena *arena, ptrdiff_t size, ptrdiff_t align) {
     // Align Pointer
-    uint8_t *start = (uint8_t*)ALIGN_UP_PTR(arena->pos, align);
+    uint8_t *start = (uint8_t *)ALIGN_UP_PTR(arena->pos, align);
 
     // Commit new page if needed.
     uint8_t *new_pos = start + size;
@@ -421,7 +459,7 @@ uint8_t* arena_alloc_size(Arena* arena, ptrdiff_t size, ptrdiff_t align) {
         // VirtualAlloc(first_uncommitted_page, size, MEM_COMMIT, PAGE_READWRITE);
         ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE);
         assert(pagesize >= 0);
-        if (mprotect(arena->commit, (size_t)pagesize, PROT_READ|PROT_WRITE) == -1) {
+        if (mprotect(arena->commit, (size_t)pagesize, PROT_READ | PROT_WRITE) == -1) {
             perror("Ran out of virtual memory");
             exit(1);
         }
@@ -431,7 +469,8 @@ uint8_t* arena_alloc_size(Arena* arena, ptrdiff_t size, ptrdiff_t align) {
     return start;
 }
 
-// The size of the data in the arena. This is the size of buffer you would need to call arena_serialize.
+// The size of the data in the arena. This is the size of buffer you would need to call
+// arena_serialize.
 ptrdiff_t arena_size(Arena *arena) {
     return arena->pos - arena->begin - (ptrdiff_t)sizeof(Arena);
 }
@@ -441,7 +480,7 @@ void arena_serialize(void *buf, Arena *arena) {
 }
 
 // Note: This only works on an empty arena, if the arena passed in is not empty it will get reset.
-// todo(steve): Return an error or something instead of just resetting the arena.
+// @todo(steve): Return an error or something instead of just resetting the arena.
 void arena_deserialize(Arena *arena, void *buf, ptrdiff_t size) {
     arena_reset(arena);
     uint8_t *data = arena_alloc_size(arena, size, 1);
@@ -460,7 +499,8 @@ uint8_t *arena__clone_slice(Arena *arena, U8Slice *slice, ptrdiff_t item_size) {
 }
 
 U8Array *arena__alloc_array(Arena *arena, ptrdiff_t item_size, ptrdiff_t cap) {
-    U8Array *array = (U8Array*)arena_alloc_size(arena, (ptrdiff_t)sizeof(U8Array) + item_size * cap, 16);
+    U8Array *array =
+        (U8Array *)arena_alloc_size(arena, (ptrdiff_t)sizeof(U8Array) + item_size * cap, 16);
     array->len = 0;
     array->cap = cap;
     return array;
@@ -476,7 +516,7 @@ U8Array *arena__grow_array(Arena *arena, U8Array *array, ptrdiff_t item_size, pt
     }
     if (new_cap > array->cap) {
         // Grow the array
-        if (arena->pos == (uint8_t*)(array->e) + array->cap * item_size) {
+        if (arena->pos == (uint8_t *)(array->e) + array->cap * item_size) {
             // Array is on the end of the arena, we can just grow it.
             arena_alloc_size(arena, (new_cap - array->cap) * item_size, 1);
             array->cap = new_cap;
@@ -500,7 +540,7 @@ U8Array *arena__clone_arr(Arena *arena, U8Array *array, ptrdiff_t item_size) {
 }
 
 char *arena__alloc_cstring(Arena *a, String *s) {
-    char *c = (char*) arena_alloc_size(a, s->len + 1, _Alignof(char));
+    char *c = (char *)arena_alloc_size(a, s->len + 1, _Alignof(char));
     xmemcpy(c, s->e, s->len);
     c[s->len] = '\0';
     return c;
@@ -513,15 +553,15 @@ String format(Arena *a, const char *fmt, ...) {
     va_copy(args_copy, args);
     ptrdiff_t len = vsnprintf(NULL, 0, fmt, args_copy);
     va_end(args_copy);
-    char *c = (char*) arena_alloc_size(a, len + 1, _Alignof(char));
+    char *c = (char *)arena_alloc_size(a, len + 1, _Alignof(char));
     vsnprintf(c, (size_t)len + 1, fmt, args);
     va_end(args);
-    return (String){ .len = len, .e = c };
+    return (String){.len = len, .e = c};
 }
 
 StringSlice str_split(Arena *a, String s, char sep) {
     // Skip leading separators.
-    int i=0;
+    int i = 0;
     StringArray *parts = NULL;
     while (i < s.len) {
         int start = i;
@@ -529,7 +569,7 @@ StringSlice str_split(Arena *a, String s, char sep) {
             i++;
         }
         if (i > start) {
-            String part = { .len = i - start, .e = s.e + start };
+            String part = {.len = i - start, .e = s.e + start};
             arr_push(a, parts, part);
         }
         while (i < s.len && s.e[i] == sep) {
@@ -537,14 +577,14 @@ StringSlice str_split(Arena *a, String s, char sep) {
         }
     }
     if (parts == NULL) {
-        return (StringSlice){ .len = 0, .e = NULL };
+        return (StringSlice){.len = 0, .e = NULL};
     }
     StringSlice result = arr_slice(parts);
     return result;
 }
 
 // NOLINTEND(modernize-use-nullptr)
-#endif //STEVE_IMPLEMENTATION
+#endif // STEVE_IMPLEMENTATION
 
 #ifdef STEVE_TEST
 // NOLINTBEGIN(modernize-use-nullptr)
@@ -603,16 +643,16 @@ static void test_helpers(void) {
     assert(MAX(10, 20) == 20);
     assert(MAX(-5, 3) == 3);
 
-    assert(CLAMP_MAX(25, 20) == 20);  // 25 clamped to 20
-    assert(CLAMP_MAX(15, 20) == 15);  // within limit
-    assert(CLAMP_MIN(-1, 0) == 0);    // -1 clamped to 0
-    assert(CLAMP_MIN(10, 0) == 10);   // within limit
+    assert(CLAMP_MAX(25, 20) == 20); // 25 clamped to 20
+    assert(CLAMP_MAX(15, 20) == 15); // within limit
+    assert(CLAMP_MIN(-1, 0) == 0);   // -1 clamped to 0
+    assert(CLAMP_MIN(10, 0) == 10);  // within limit
 
     assert(IS_POW2(1) == true);
     assert(IS_POW2(2) == true);
     assert(IS_POW2(3) == false);
     assert(IS_POW2(4) == true);
-    assert(IS_POW2(0) == false);  // Edge case: 0 is not a power of 2
+    assert(IS_POW2(0) == false); // Edge case: 0 is not a power of 2
 
     assert(ALIGN_UP(0, 8) == 0);
     assert(ALIGN_UP(1, 8) == 8);
@@ -628,13 +668,12 @@ static void test_helpers(void) {
 
     {
         uintptr_t ptr_val = 15;
-        void* p1 = (void*)ptr_val;
-        void* aligned_up = ALIGN_UP_PTR(p1, 8);
-        void* aligned_down = ALIGN_DOWN_PTR(p1, 8);
+        void *p1 = (void *)ptr_val;
+        void *aligned_up = ALIGN_UP_PTR(p1, 8);
+        void *aligned_down = ALIGN_DOWN_PTR(p1, 8);
         assert((uintptr_t)aligned_up == 16);
         assert((uintptr_t)aligned_down == 8);
     }
-
 }
 
 static void test_arena_acquire_release(void) {
@@ -703,7 +742,7 @@ static void test_arena_alloc_alignment(void) {
 
     // Test alignment for 1, 2, 4, 16
     ptrdiff_t alignments[] = {1, 2, 4, 16};
-    for (int i=0; i<4; i++) {
+    for (int i = 0; i < 4; i++) {
         ptrdiff_t align = alignments[i];
         uint8_t *p = arena_alloc_size(a, 10, align);
         assert(((ptrdiff_t)p % align) == 0 && "Pointer must be aligned");
@@ -721,7 +760,7 @@ static void test_arena_large_alloc(void) {
     Arena *a = arena_acquire();
     ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE);
     ptrdiff_t big_size = pagesize * 5;
-    void* big_block = arena_alloc_size(a, big_size, 16);
+    void *big_block = arena_alloc_size(a, big_size, 16);
     assert(big_block != NULL);
     // Mke sure we can write to it.
     memset(big_block, 0xAB, (size_t)big_size);
@@ -749,23 +788,23 @@ static void test_slices(void) {
     // Create an array
     typedef Array(int) IntArray;
     IntArray *arr = NULL;
-    for (int i=0; i<5; i++) {
-        arr_push(a, arr, i*10);
+    for (int i = 0; i < 5; i++) {
+        arr_push(a, arr, i * 10);
     }
 
     // Turn into slice
     typedef Slice(int) IntSlice;
     IntSlice s = arr_slice(arr);
     assert(s.len == 5);
-    for (int i=0; i<5; i++) {
-        assert(s.e[i] == i*10);
+    for (int i = 0; i < 5; i++) {
+        assert(s.e[i] == i * 10);
     }
 
     // Clone slice
     Arena *a2 = arena_acquire();
     IntSlice clone = arena_clone_slice(a2, s);
     assert(clone.len == s.len);
-    for (int i=0; i<5; i++) {
+    for (int i = 0; i < 5; i++) {
         assert(clone.e[i] == s.e[i]);
     }
     // Mutate original
@@ -784,16 +823,16 @@ static void test_rel_slices(void) {
     // Create an array
     typedef Array(int) IntArray;
     IntArray *arr = NULL;
-    for (int i=0; i<5; i++) {
-        arr_push(a, arr, i*10);
+    for (int i = 0; i < 5; i++) {
+        arr_push(a, arr, i * 10);
     }
 
     // Turn into slice
     typedef Slice(int) IntSlice;
     IntSlice s = arr_slice(arr);
     assert(s.len == 5);
-    for (int i=0; i<5; i++) {
-        assert(s.e[i] == i*10);
+    for (int i = 0; i < 5; i++) {
+        assert(s.e[i] == i * 10);
     }
 
     // Turn into relative slice
@@ -803,8 +842,8 @@ static void test_rel_slices(void) {
     // Turn back into slice
     IntSlice s2 = slice_ptr(a, rs);
     assert(s2.len == 5);
-    for (int i=0; i<5; i++) {
-        assert(s2.e[i] == i*10);
+    for (int i = 0; i < 5; i++) {
+        assert(s2.e[i] == i * 10);
     }
 
     arena_release(a);
@@ -824,23 +863,23 @@ static void test_dynamic_arrays(void) {
 
     // Push elements
     arr = NULL;
-    for (int i=0; i<10; i++) {
+    for (int i = 0; i < 10; i++) {
         arr_push(a, arr, i);
-        assert(arr->len == i+1);
-        for (int j=0; j<=i; j++) {
+        assert(arr->len == i + 1);
+        for (int j = 0; j <= i; j++) {
             assert(arr->e[j] == j);
         }
     }
 
     // Force reallocation
     // The library starts with capacity=4 if we push many items, we ensure multiple grows.
-    for (int i=0; i<100; i++) {
+    for (int i = 0; i < 100; i++) {
         arr_push(a, arr, i + 100);
     }
     assert(arr->len == 110);
 
     // arr_push_slice
-    IntSlice slice = { .len = 3, .e = (int[]){999, 1000, 1001} };
+    IntSlice slice = {.len = 3, .e = (int[]){999, 1000, 1001}};
     arr_push_slice(a, arr, slice);
     assert(arr->len == 113);
     assert(arr->e[110] == 999);
@@ -850,15 +889,15 @@ static void test_dynamic_arrays(void) {
     // setlen
     // Length that puts us on a new page so that we know it worked if we can write to the end.
     ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE);
-    arr_setlen(a, arr, pagesize+200);
-    assert(arr->len == pagesize+200);
-    arr->e[pagesize+199] = 1234;
+    arr_setlen(a, arr, pagesize + 200);
+    assert(arr->len == pagesize + 200);
+    arr->e[pagesize + 199] = 1234;
 
     // clone_array
     Arena *a2 = arena_acquire();
     IntArray *clone = arena_clone_arr(a2, arr);
     assert(clone->len == arr->len);
-    for (int i=0; i<(int)arr->len; i++) {
+    for (int i = 0; i < (int)arr->len; i++) {
         assert(clone->e[i] == arr->e[i]);
     }
 
@@ -873,8 +912,8 @@ static void test_arena_serialize(void) {
     typedef Array(int) IntArray;
     typedef Slice(int) IntSlice;
     IntArray *arr = NULL;
-    for (int i=0; i<10; i++) {
-        arr_push(a, arr, i*10);
+    for (int i = 0; i < 10; i++) {
+        arr_push(a, arr, i * 10);
     }
     ptrdiff_t arr_rel = rel(a, arr);
     IntSlice s = arr_slice(arr);
@@ -897,9 +936,9 @@ static void test_arena_serialize(void) {
     assert(s_copy.len == 10);
     assert(s_copy.e == arr_copy->e);
     assert(arr_copy->len == 10);
-    for (int i=0; i<10; i++) {
-        assert(arr_copy->e[i] == i*10);
-        assert(s_copy.e[i] == i*10);
+    for (int i = 0; i < 10; i++) {
+        assert(arr_copy->e[i] == i * 10);
+        assert(s_copy.e[i] == i * 10);
     }
     free(buf);
 
@@ -913,9 +952,9 @@ static void test_arena_serialize(void) {
     assert(s_copy2.len == 10);
     assert(s_copy2.e == arr_copy->e);
     assert(arr_copy->len == 10);
-    for (int i=0; i<10; i++) {
-        assert(arr_copy->e[i] == i*10);
-        assert(s_copy2.e[i] == i*10);
+    for (int i = 0; i < 10; i++) {
+        assert(arr_copy->e[i] == i * 10);
+        assert(s_copy2.e[i] == i * 10);
     }
 
     arena_release(a);
@@ -969,4 +1008,4 @@ static void test_strings(void) {
 }
 
 // NOLINTEND(modernize-use-nullptr)
-#endif //STEVE_TEST
+#endif // STEVE_TEST
