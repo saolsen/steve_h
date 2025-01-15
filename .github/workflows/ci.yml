@@ -33,6 +33,7 @@ jobs:
 
     - name: Build and test
       run: |
+        $CC --version
         $CC -o test_steve test_steve.c ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
         ./test_steve
 
@@ -62,6 +63,7 @@ jobs:
 
     - name: Build and test
       run: |
+        $CC --version
         $CC -o test_steve test_steve.c ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
         ./test_steve
 
