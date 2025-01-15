@@ -22,9 +22,11 @@
 //   * Handles
 #ifndef STEVE_H
 #define STEVE_H
+// NOLINTBEGIN(modernize-use-nullptr)
 
 #include <stdint.h>
 #include <stddef.h>
+
 
 #define MIN(x, y) ((x) <= (y) ? (x) : (y))
 #define MAX(x, y) ((x) >= (y) ? (x) : (y))
@@ -262,9 +264,11 @@ struct Pool {
 };
 #endif
 
+// NOLINTEND(modernize-use-nullptr)
 #endif //STEVE_H
 
 #ifdef STEVE_IMPLEMENTATION
+// NOLINTBEGIN(modernize-use-nullptr)
 
 #include <assert.h>
 #include <stdio.h>
@@ -474,10 +478,11 @@ StringSlice str_split(Arena *a, String s, char sep) {
     return result;
 }
 
-
+// NOLINTEND(modernize-use-nullptr)
 #endif //STEVE_IMPLEMENTATION
 
 #ifdef STEVE_TEST
+// NOLINTBEGIN(modernize-use-nullptr)
 
 #include <assert.h>
 #include <stdio.h>
@@ -898,4 +903,5 @@ static void test_strings() {
     arena_free_all();
 }
 
-#endif
+// NOLINTEND(modernize-use-nullptr)
+#endif //STEVE_TEST
