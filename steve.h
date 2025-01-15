@@ -30,14 +30,14 @@
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202302L)
     #define STATIC_ASSERT(exp) static_assert(exp)
     #define THREAD_LOCAL_STATIC thread_local static
-#elif defined(_MSC_VER)
-    #define THREAD_LOCAL_STATIC __declspec(thread)
-    #define STATIC_ASSERT(expr, msg) // @todo(steve): figure out how to do this on msvc
 #elif defined(__GNUC__) || defined(__clang__)
     #include <assert.h>
     #include <stdbool.h>
     #define STATIC_ASSERT(exp) _Static_assert(exp, #exp)
     #define THREAD_LOCAL_STATIC static __thread
+#elif defined(_MSC_VER)
+    #define THREAD_LOCAL_STATIC __declspec(thread)
+    #define STATIC_ASSERT(expr, msg) // @todo(steve): figure out how to do this on msvc
 #else
     #error "Unsupported Compiler"
 #endif
