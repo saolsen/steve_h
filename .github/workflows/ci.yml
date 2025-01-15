@@ -101,11 +101,11 @@ jobs:
     - name: Build and test with MSVC
       if: matrix.compiler == 'msvc'
       run: |
-        cl /Fe:test_steve.exe test_steve.c /DSTEVE_IMPLEMENTATION /DSTEVE_TEST ${{ matrix.c_flags }} /W4 /WX
+        cl /Fe:test_steve.exe test_steve.c ${{ matrix.c_flags }} /W4 /WX
         .\test_steve.exe
 
     - name: Build and test with GCC/Clang
       if: matrix.compiler != 'msvc'
       run: |
-        ${{ matrix.cc }} -o test_steve.exe test_steve.c -DSTEVE_IMPLEMENTATION -DSTEVE_TEST ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
+        ${{ matrix.cc }} -o test_steve.exe test_steve.c ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
         .\test_steve.exe

@@ -86,7 +86,7 @@ static_assert(sizeof(Arena) % 16 == 0);
 
 // Pool of already allocated arenas that aren't in use. This lets us reuse arenas for small (temp/scratch) allocations
 // without having to pass them around or pay the cost of allocating a new one each time.
-thread_local static Arena *arena__free_list;
+thread_local static Arena *arena__free_list = nullptr;
 
 Arena *arena_acquire();
 void arena_reset(Arena *arena);
