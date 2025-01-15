@@ -50,7 +50,6 @@
 //   * Linux
 //     * gcc (c11 and c23)
 //     * clang (c11 and c23)
-//     * @todo(steve): cosmocc
 //     * @todo(steve): Make sure works with musl as well as glibc.
 //   * MacOS
 //     * gcc (c11 and c23) (Does anybody use this?)
@@ -60,6 +59,9 @@
 //     * clang (c11 and c23)
 //     * msvc (c11 and c17)
 //   * @todo(steve): Support SDL instead of stdlib for all these platforms.
+//   * @todo(steve): Support cosmocc.
+//   * @todo(steve): Support zigc.
+//   * @todo(steve): Does stuff like tinycc support at least c11? If so maybe support those too.
 // * One block like this should figure out the compiler and set some easier to switch on defines.
 //     eg: STEVE_MACOS_CLANG_C23
 //   I can maybe look at other projects like sdl to see how they do this.
@@ -521,16 +523,16 @@ StringSlice str_split(Arena *a, String s, char sep) {
     // Skip leading separators.
     int i=0;
     StringArray *parts = NULL;
-    while(i < s.len) {
+    while (i < s.len) {
         int start = i;
-        while(i < s.len && s.e[i] != sep) {
+        while (i < s.len && s.e[i] != sep) {
             i++;
         }
         if (i > start) {
             String part = { .len = i - start, .e = s.e + start };
             arr_push(a, parts, part);
         }
-        while(i < s.len && s.e[i] == sep) {
+        while (i < s.len && s.e[i] == sep) {
             i++;
         }
     }
