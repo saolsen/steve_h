@@ -1,5 +1,8 @@
 // Single header file library for C.
 // * Provides an arena allocator and some data structures that use it.
+// * Requires c11 or c23. Tested on gcc and clang on macos and linux.
+//   @todo: support mingw64, clang and msvc on windows.
+//   @todo: support and test on cosmocc.
 //
 // * Maintains a (thread local) pool of arenas so they are cheap to acquire and release for temporary allocations.
 //   Since all allocations are backed by arenas you don't have to free anything individually, just
@@ -37,7 +40,7 @@
     #define THREAD_LOCAL_STATIC static __thread
 #elif defined(_MSC_VER)
     #define THREAD_LOCAL_STATIC __declspec(thread)
-    #define STATIC_ASSERT(expr, msg) // @todo(steve): figure out how to do this on msvc
+    #define STATIC_ASSERT(exp) static_assert(exp, #exp)
 #else
     #error "Unsupported Compiler"
 #endif
