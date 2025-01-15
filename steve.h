@@ -26,10 +26,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#ifndef nullptr
-#define nullptr NULL
-#endif
-
 #define MIN(x, y) ((x) <= (y) ? (x) : (y))
 #define MAX(x, y) ((x) >= (y) ? (x) : (y))
 #define CLAMP_MAX(x, max) MIN(x, max)
