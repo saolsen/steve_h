@@ -92,9 +92,9 @@ jobs:
 
     - name: Set up MinGW
       if: matrix.compiler == 'gcc'
-      uses: egor-tensin/setup-mingw@v2
+      uses: egor-tensin/setup-mingw@v2.2.0
       with:
-        platform: x64
+        version: 12.2.0 
 
     - name: Setup LLVM
       if: matrix.compiler == 'clang'
