@@ -1,3 +1,2 @@
-cmake-*
-CMakeLists.txt
+build/cmake/cmake-*
 .idea

@@ -23,6 +23,20 @@
 //   * HashMap.
 //   * Pool
 //   * Handles
+
+// * Other Ideas
+//   * Debug print macros that print to stdout on posix and the debug console on windows (for viewing in raddbg)
+//   * Helpers to draw stuff with sixel, supported in windows terminal now so cross platform as far as this lib cares.
+//   * A debug mode that tracks memory usage.
+//   * Helpers to view these data structures in the debugger.
+//     * @note(steve): in clion, you can view a pointer as an array like this.
+//         ptr @ len
+//       * View an array
+//         *(&(arr->e[0])) @ arr->len
+//       * View a slice
+//         *slc.e @ slc.len
+//     * @todo(steve): Document how to do this in raddbg.
+
 #ifndef STEVE_H
 #define STEVE_H
 // NOLINTBEGIN(modernize-use-nullptr)
@@ -30,6 +44,25 @@
 #include <stdint.h>
 #include <stddef.h>
 
+// @todo(steve): Clean up this block.
+// * Make it more obvious which compilers and c versions are supported.
+//   The current list is
+//   * Linux
+//     * gcc (c11 and c23)
+//     * clang (c11 and c23)
+//     * @todo(steve): cosmocc
+//     * @todo(steve): Make sure works with musl as well as glibc.
+//   * MacOS
+//     * gcc (c11 and c23) (Does anybody use this?)
+//     * clang (c11 and c23)
+//   * Windows
+//     * mingw64 (not sure the c versions supported)
+//     * clang (c11 and c23)
+//     * msvc (c11 and c17)
+//   * @todo(steve): Support SDL instead of stdlib for all these platforms.
+// * One block like this should figure out the compiler and set some easier to switch on defines.
+//     eg: STEVE_MACOS_CLANG_C23
+//   I can maybe look at other projects like sdl to see how they do this.
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202302L)
     #define STATIC_ASSERT(exp) static_assert(exp)
     #define THREAD_LOCAL_STATIC thread_local static
