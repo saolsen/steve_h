@@ -291,9 +291,14 @@ struct Pool {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/mman.h>
 #include <stdarg.h>
+
+#ifdef _WIN32
+    #include <Windows.h>
+#else
+    #include <unistd.h>
+    #include <sys/mman.h>
+#endif
 
 void* xmemcpy(void *dest, const void *src, ptrdiff_t n) {
     assert(n >= 0);
@@ -313,12 +318,15 @@ Arena *arena_acquire(void) {
     ptrdiff_t cap = pagesize * 4 * 1024 * 1024;  // 64GB on my machine. @note(steve): probably way too much
     assert(cap >= 0);
     // todo(steve): windows
+    // VirtualAlloc(null, size, MEM_RESERVE, PAGE_READWRITE);
     void *r = mmap(NULL, (size_t)cap, PROT_NONE, MAP_ANON|MAP_PRIVATE, -1, 0);
     if (r == MAP_FAILED) {
         perror("mmap");
         exit(1);
     }
     // commit first page
+    // todo(steve): windows
+    // VirtualAlloc(first_uncommitted_page, size, MEM_COMMIT, PAGE_READWRITE);
     if (mprotect(r, (size_t)pagesize, PROT_READ|PROT_WRITE) == -1) {
         perror("Ran out of virtual memory");
         exit(1);
@@ -338,6 +346,8 @@ void arena_release(Arena *arena) {
     // opt(steve): If we have a lot of pages committed, we could free it
     //   and then create a new virtual allocation the next time it's used.
     //   On windows, you can "uncommit" pages but not on posix.
+    // todo(steve): windows
+    //
     arena_reset(arena);
     arena->next_free = arena__free_list;
     arena__free_list = arena;
@@ -345,6 +355,7 @@ void arena_release(Arena *arena) {
 
 void arena_free(Arena *arena) {
     // todo(steve): windows
+    // VirtualFree(arena->begin, 0, MEM_RELEASE);
     ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE);
     assert(pagesize >= 0);
     if (munmap(arena->begin, (size_t)pagesize * 4 * 1024 * 1024) == -1) {
@@ -371,6 +382,7 @@ uint8_t* arena_alloc_size(Arena* arena, ptrdiff_t size, ptrdiff_t align) {
     uint8_t *new_pos = start + size;
     while (new_pos > arena->commit) {
         // todo(steve): windows
+        // VirtualAlloc(first_uncommitted_page, size, MEM_COMMIT, PAGE_READWRITE);
         ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE);
         assert(pagesize >= 0);
         if (mprotect(arena->commit, (size_t)pagesize, PROT_READ|PROT_WRITE) == -1) {
