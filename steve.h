@@ -96,23 +96,25 @@ typedef double    F64;
 typedef size_t    Size;
 typedef ptrdiff_t Offset;
 
-// Assert what we expect these to be.
-// @note(steve): this library only supports 64bit systems and these should be consistent.
-STATIC_ASSERT(sizeof(unsigned char) == sizeof(U8));
-STATIC_ASSERT(sizeof(char) == sizeof(I8));
-STATIC_ASSERT(sizeof(unsigned short) == sizeof(U16));
-STATIC_ASSERT(sizeof(short) == sizeof(I16));
-STATIC_ASSERT(sizeof(unsigned int) == sizeof(U32));
-STATIC_ASSERT(sizeof(int) == sizeof(I32));
-STATIC_ASSERT(sizeof(unsigned long) == sizeof(U64));
-STATIC_ASSERT(sizeof(long) == sizeof(I64));
-STATIC_ASSERT(sizeof(unsigned long long) == sizeof(U64));
-STATIC_ASSERT(sizeof(long long) == sizeof(I64));
+// Assert what these HAVE to be for the library to work.
 STATIC_ASSERT(sizeof(float) == sizeof(F32));
 STATIC_ASSERT(sizeof(double) == sizeof(F64));
-STATIC_ASSERT(sizeof(long double) == sizeof(F64));
 STATIC_ASSERT(sizeof(Size) == sizeof(U64));
 STATIC_ASSERT(sizeof(Offset) == sizeof(I64));
+STATIC_ASSERT(sizeof(unsigned char) == sizeof(U8));
+STATIC_ASSERT(sizeof(char) == sizeof(I8));
+
+// These are what how other types match on apple silicon.
+// But this is not consistent accross platforms, so they shouldn't be used.
+//STATIC_ASSERT(sizeof(unsigned short) == sizeof(U16));
+//STATIC_ASSERT(sizeof(short) == sizeof(I16));
+//STATIC_ASSERT(sizeof(unsigned int) == sizeof(U32));
+//STATIC_ASSERT(sizeof(int) == sizeof(I32));
+//STATIC_ASSERT(sizeof(unsigned long) == sizeof(U64));
+//STATIC_ASSERT(sizeof(long) == sizeof(I64));
+//STATIC_ASSERT(sizeof(unsigned long long) == sizeof(U64));
+//STATIC_ASSERT(sizeof(long long) == sizeof(I64));
+
 
 #define MIN(x, y) ((x) <= (y) ? (x) : (y))
 #define MAX(x, y) ((x) >= (y) ? (x) : (y))
