@@ -78,7 +78,7 @@ jobs:
             c_flags: /std:c23
           - compiler: gcc
             cc: gcc
-            c_flags: -std=c2x
+            c_flags: -std=gnu2x
           - compiler: clang
             cc: clang
             c_flags: -std=c2x

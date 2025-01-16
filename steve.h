@@ -369,13 +369,13 @@ struct Pool {
 // todo(steve): Can I set a pragma or whatever to link kernal32.lib?
 //#pragma comment(lib, "kernel32.lib")
 
-ptrdiff_t memory__page_size(void) {
+static ptrdiff_t memory__page_size(void) {
     SYSTEM_INFO sys_info;
     GetSystemInfo(&sys_info);
     return sys_info.dwPageSize;
 }
 
-uint8_t *memory__reserve(ptrdiff_t size) {
+static uint8_t *memory__reserve(ptrdiff_t size) {
     void *r = VirtualAlloc(NULL, (size_t)size, MEM_RESERVE, PAGE_READWRITE);
     if (r == NULL) {
         // @todo(steve): Call GetLastError to get the error message.
@@ -385,7 +385,7 @@ uint8_t *memory__reserve(ptrdiff_t size) {
     return r;
 }
 
-void memory__commit(uint8_t *addr, ptrdiff_t size) {
+static void memory__commit(uint8_t *addr, ptrdiff_t size) {
     // addr should be the start of a page and size should be a multiple of the page size.
     if (VirtualAlloc(addr, (size_t)size, MEM_COMMIT, PAGE_READWRITE) == 0) {
         perror("memory__commit");
@@ -393,7 +393,7 @@ void memory__commit(uint8_t *addr, ptrdiff_t size) {
     }
 }
 
-void memory__free(uint8_t *addr) {
+static void memory__free(uint8_t *addr) {
     if (VirtualFree(addr, 0, MEM_RELEASE) == 0) {
         perror("memory__free");
         exit(1);
@@ -404,11 +404,11 @@ void memory__free(uint8_t *addr) {
 #include <sys/mman.h>
 #include <unistd.h>
 
-ptrdiff_t memory__page_size(void) {
+static ptrdiff_t memory__page_size(void) {
     return sysconf(_SC_PAGE_SIZE);
 }
 
-uint8_t *memory__reserve(ptrdiff_t size) {
+static uint8_t *memory__reserve(ptrdiff_t size) {
     void *addr = mmap(NULL, (size_t)size, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (addr == MAP_FAILED) {
         perror("memory__reserve");
@@ -417,7 +417,7 @@ uint8_t *memory__reserve(ptrdiff_t size) {
     return addr;
 }
 
-void memory__commit(uint8_t *addr, ptrdiff_t size) {
+static void memory__commit(uint8_t *addr, ptrdiff_t size) {
     // addr should be the start of a page and size should be a multiple of the page size.
     if (mprotect(addr, (size_t)size, PROT_READ | PROT_WRITE) == -1) {
         perror("memory__commit");
@@ -425,7 +425,7 @@ void memory__commit(uint8_t *addr, ptrdiff_t size) {
     }
 }
 
-void memory__free(uint8_t *addr) {
+static void memory__free(uint8_t *addr) {
     ptrdiff_t pagesize = memory__page_size();
     if (munmap(addr, (size_t)pagesize * 4 * 1024 * 1024) == -1) {
         perror("munmap");
