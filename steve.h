@@ -409,7 +409,7 @@ ptrdiff_t memory__page_size(void) {
 }
 
 uint8_t *memory__reserve(ptrdiff_t size) {
-    void *addr = mmap(NULL, (size_t)cap, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
+    void *addr = mmap(NULL, (size_t)size, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (addr == MAP_FAILED) {
         perror("memory__reserve");
         exit(1);
@@ -426,7 +426,11 @@ void memory__commit(uint8_t *addr, ptrdiff_t size) {
 }
 
 void memory__free(uint8_t *addr) {
-
+    ptrdiff_t pagesize = memory__page_size(void);
+    if (munmap(arena->begin, (size_t)pagesize * 4 * 1024 * 1024) == -1) {
+        perror("munmap");
+        exit(1);
+    }
 }
 
 #endif
