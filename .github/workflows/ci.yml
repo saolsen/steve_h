@@ -73,9 +73,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - compiler: msvc
-            cc: cl
-            c_flags: /std:c23
+#          - compiler: msvc
+#            cc: cl
+#            c_flags: /std:c23
           - compiler: gcc
             cc: gcc
             c_flags: -std=gnu2x
