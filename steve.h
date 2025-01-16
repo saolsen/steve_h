@@ -103,9 +103,22 @@ STATIC_ASSERT(sizeof(Size) == sizeof(U64));
 STATIC_ASSERT(sizeof(Offset) == sizeof(I64));
 STATIC_ASSERT(sizeof(unsigned char) == sizeof(U8));
 STATIC_ASSERT(sizeof(char) == sizeof(I8));
+STATIC_ASSERT(sizeof(U8) == 1);
+STATIC_ASSERT(sizeof(I8) == 1);
+STATIC_ASSERT(sizeof(U16) == 2);
+STATIC_ASSERT(sizeof(I16) == 2);
+STATIC_ASSERT(sizeof(U32) == 4);
+STATIC_ASSERT(sizeof(I32) == 4);
+STATIC_ASSERT(sizeof(U64) == 8);
+STATIC_ASSERT(sizeof(I64) == 8);
+STATIC_ASSERT(sizeof(F32) == 4);
+STATIC_ASSERT(sizeof(F64) == 8);
+STATIC_ASSERT(sizeof(Size) == 8);
+STATIC_ASSERT(sizeof(Offset) == 8);
 
-// These are what how other types match on Apple Silicon.
-// But this is not consistent across platforms, so they shouldn't be used.
+// These asserts show how the other standard types match on Apple Silicon.
+// This is not consistent across platforms, so types without explicit sizes should not be used.
+// The above types should be used instead.
 // STATIC_ASSERT(sizeof(unsigned short) == sizeof(U16));
 // STATIC_ASSERT(sizeof(short) == sizeof(I16));
 // STATIC_ASSERT(sizeof(unsigned int) == sizeof(U32));
@@ -570,7 +583,7 @@ U8 *arena__clone_slice(Arena *arena, U8Slice *slice, Size item_size) {
 }
 
 U8Array *arena__alloc_array(Arena *arena, Size item_size, U64 cap) {
-    U8Array *array = (U8Array *)arena_alloc_size(arena, sizeof(U8Array) + item_size * cap, 16);
+    U8Array *array = (U8Array *)arena_alloc_size(arena, sizeof(U8Array) + (item_size * cap), 16);
     array->len = 0;
     array->cap = cap;
     return array;
@@ -658,8 +671,6 @@ StringSlice str_split(Arena *a, String s, char sep) {
 
 #ifdef STEVE_TEST
 // NOLINTBEGIN(modernize-use-nullptr)
-
-#include <assert.h>
 
 static void test_helpers(void);
 static void test_arena_acquire_release(void);
