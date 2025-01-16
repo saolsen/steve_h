@@ -329,7 +329,7 @@ U8Array *arena__clone_arr(Arena *arena, U8Array *array, Size item_size);
 // * To get a String view of a c string, use the str macro.
 typedef Slice(U8) String;
 
-#define str(c_string) ((String){.len = strlen(c_string), .e = c_string})
+#define str(c_string) ((String){.len = strlen(c_string), .e = (U8*)c_string})
 #define cstr(a, s) arena__alloc_cstring((a), (s))
 
 typedef Array(String) StringArray;
@@ -533,7 +533,7 @@ U8 *arena_alloc_size(Arena *arena, Size size, Offset align) {
         while (new_pos > new_commit) {
             new_commit += pagesize;
         }
-        memory__commit(arena->commit, new_commit - arena->commit);
+        memory__commit(arena->commit, (Size)(new_commit - arena->commit));
         arena->commit = new_commit;
     }
     arena->pos = new_pos;
@@ -544,7 +544,7 @@ U8 *arena_alloc_size(Arena *arena, Size size, Offset align) {
 // arena_serialize.
 Size arena_size(Arena *arena) {
     Offset buf_span = arena->pos - arena->begin;
-    assert(buf_span >= sizeof(Arena));
+    assert((Size)buf_span >= sizeof(Arena));
     return (Size)buf_span - sizeof(Arena);
 }
 
@@ -583,7 +583,7 @@ U8Array *arena__grow_array(Arena *arena, U8Array *array, Size item_size, U64 amo
     if (array == NULL) {
         return arena__alloc_array(arena, item_size, MAX(4, amount));
     }
-    Offset new_cap = MAX(array->cap, 4);
+    Size new_cap = MAX(array->cap, 4);
     while (MAX(array->cap, array->len) + amount > new_cap) {
         new_cap *= 2;
     }
@@ -624,7 +624,7 @@ String format(Arena *a, const char *fmt, ...) {
     va_start(args, fmt);
     va_list args_copy;
     va_copy(args_copy, args);
-    Size len = vsnprintf(NULL, 0, fmt, args_copy);
+    Size len = (Size)vsnprintf(NULL, 0, fmt, args_copy);
     va_end(args_copy);
     char *c = (char *)arena_alloc_size(a, len + 1, _Alignof(char));
     vsnprintf(c, len + 1, fmt, args);
@@ -937,7 +937,7 @@ static void test_dynamic_arrays(void) {
     arr = NULL;
     for (I32 i = 0; i < 10; i++) {
         arr_push(a, arr, i);
-        assert(arr->len == i + 1);
+        assert(arr->len == (U64)i + 1);
         for (I32 j = 0; j <= i; j++) {
             assert(arr->e[j] == j);
         }
@@ -969,7 +969,7 @@ static void test_dynamic_arrays(void) {
     Arena *a2 = arena_acquire();
     I32Array *clone = arena_clone_arr(a2, arr);
     assert(clone->len == arr->len);
-    for (I32 i = 0; i < arr->len; i++) {
+    for (U32 i = 0; i < arr->len; i++) {
         assert(clone->e[i] == arr->e[i]);
     }
 
@@ -984,7 +984,7 @@ static void test_arena_serialize(void) {
     typedef Array(I32) I32Array;
     typedef Slice(I32) I32Slice;
     I32Array *arr = NULL;
-    for (U32 i = 0; i < 10; i++) {
+    for (I32 i = 0; i < 10; i++) {
         arr_push(a, arr, i * 10);
     }
     Offset arr_rel = rel(a, arr);
@@ -1000,11 +1000,11 @@ static void test_arena_serialize(void) {
     arena_deserialize(copy, buf, size);
 
     // Check data
-    IntArray *arr_copy = ptr(copy, arr_rel);
-    IntSlice s_copy = slice_ptr(copy, s_rel);
+    I32Array *arr_copy = ptr(copy, arr_rel);
+    I32Slice s_copy = slice_ptr(copy, s_rel);
     assert(arr_copy != arr);
     assert((Offset)arr_copy >= (Offset)copy->begin);
-    assert((Offset)arr_copy <= (Offset)copy->begin + size);
+    assert((Offset)arr_copy <= (Offset)(copy->begin + size));
     assert(s_copy.len == 10);
     assert(s_copy.e == arr_copy->e);
     assert(arr_copy->len == 10);
@@ -1017,10 +1017,10 @@ static void test_arena_serialize(void) {
     Arena *copy2 = arena_acquire();
     arena_clone(copy2, a);
     arr_copy = ptr(copy2, arr_rel);
-    IntSlice s_copy2 = slice_ptr(copy2, s_rel);
+    I32Slice s_copy2 = slice_ptr(copy2, s_rel);
     assert(arr_copy != arr);
     assert((Offset)arr_copy >= (Offset)copy2->begin);
-    assert((Offset)arr_copy <= (Offset)copy2->begin + size);
+    assert((Offset)arr_copy <= (Offset)(copy2->begin + size));
     assert(s_copy2.len == 10);
     assert(s_copy2.e == arr_copy->e);
     assert(arr_copy->len == 10);
@@ -1041,27 +1041,27 @@ static void test_strings(void) {
     // format
     String s1 = format(a, "Hello %d %s", 42, "World");
     assert(s1.len == 14);
-    assert(strncmp(s1.e, "Hello 42 World", s1.len) == 0);
+    assert(strncmp((const char*)s1.e, "Hello 42 World", s1.len) == 0);
 
     // split
     String s2 = str("apple,banana,cherry");
     StringSlice parts = str_split(a, s2, ',');
     assert(parts.len == 3);
-    assert(strncmp(parts.e[0].e, "apple", parts.e[0].len) == 0);
-    assert(strncmp(parts.e[1].e, "banana", parts.e[1].len) == 0);
-    assert(strncmp(parts.e[2].e, "cherry", parts.e[2].len) == 0);
+    assert(strncmp((const char*)parts.e[0].e, "apple", parts.e[0].len) == 0);
+    assert(strncmp((const char*)parts.e[1].e, "banana", parts.e[1].len) == 0);
+    assert(strncmp((const char*)parts.e[2].e, "cherry", parts.e[2].len) == 0);
 
     String s3 = str(",banana,cherry");
     parts = str_split(a, s3, ',');
     assert(parts.len == 2);
-    assert(strncmp(parts.e[0].e, "banana", parts.e[1].len) == 0);
-    assert(strncmp(parts.e[1].e, "cherry", parts.e[2].len) == 0);
+    assert(strncmp((const char*)parts.e[0].e, "banana", parts.e[1].len) == 0);
+    assert(strncmp((const char*)parts.e[1].e, "cherry", parts.e[2].len) == 0);
 
     String s4 = str("banana,cherry,");
     parts = str_split(a, s4, ',');
     assert(parts.len == 2);
-    assert(strncmp(parts.e[0].e, "banana", parts.e[1].len) == 0);
-    assert(strncmp(parts.e[1].e, "cherry", parts.e[2].len) == 0);
+    assert(strncmp((const char*)parts.e[0].e, "banana", parts.e[1].len) == 0);
+    assert(strncmp((const char*)parts.e[1].e, "cherry", parts.e[2].len) == 0);
 
     String s5 = str(",");
     parts = str_split(a, s5, ',');
