@@ -426,7 +426,7 @@ void memory__commit(uint8_t *addr, ptrdiff_t size) {
 }
 
 void memory__free(uint8_t *addr) {
-    ptrdiff_t pagesize = memory__page_size(void);
+    ptrdiff_t pagesize = memory__page_size();
     if (munmap(addr, (size_t)pagesize * 4 * 1024 * 1024) == -1) {
         perror("munmap");
         exit(1);
