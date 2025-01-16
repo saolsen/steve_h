@@ -83,17 +83,17 @@
 #endif
 
 // Primitive types.
-typedef uint8_t   U8;
-typedef int8_t    I8;
-typedef uint16_t  U16;
-typedef int16_t   I16;
-typedef uint32_t  U32;
-typedef uint64_t  U64;
-typedef int32_t   I32;
-typedef int64_t   I64;
-typedef float     F32;
-typedef double    F64;
-typedef size_t    Size;
+typedef uint8_t U8;
+typedef int8_t I8;
+typedef uint16_t U16;
+typedef int16_t I16;
+typedef uint32_t U32;
+typedef uint64_t U64;
+typedef int32_t I32;
+typedef int64_t I64;
+typedef float F32;
+typedef double F64;
+typedef size_t Size;
 typedef ptrdiff_t Offset;
 
 // Assert what these HAVE to be for the library to work.
@@ -106,15 +106,14 @@ STATIC_ASSERT(sizeof(char) == sizeof(I8));
 
 // These are what how other types match on Apple Silicon.
 // But this is not consistent across platforms, so they shouldn't be used.
-//STATIC_ASSERT(sizeof(unsigned short) == sizeof(U16));
-//STATIC_ASSERT(sizeof(short) == sizeof(I16));
-//STATIC_ASSERT(sizeof(unsigned int) == sizeof(U32));
-//STATIC_ASSERT(sizeof(int) == sizeof(I32));
-//STATIC_ASSERT(sizeof(unsigned long) == sizeof(U64));
-//STATIC_ASSERT(sizeof(long) == sizeof(I64));
-//STATIC_ASSERT(sizeof(unsigned long long) == sizeof(U64));
-//STATIC_ASSERT(sizeof(long long) == sizeof(I64));
-
+// STATIC_ASSERT(sizeof(unsigned short) == sizeof(U16));
+// STATIC_ASSERT(sizeof(short) == sizeof(I16));
+// STATIC_ASSERT(sizeof(unsigned int) == sizeof(U32));
+// STATIC_ASSERT(sizeof(int) == sizeof(I32));
+// STATIC_ASSERT(sizeof(unsigned long) == sizeof(U64));
+// STATIC_ASSERT(sizeof(long) == sizeof(I64));
+// STATIC_ASSERT(sizeof(unsigned long long) == sizeof(U64));
+// STATIC_ASSERT(sizeof(long long) == sizeof(I64));
 
 #define MIN(x, y) ((x) <= (y) ? (x) : (y))
 #define MAX(x, y) ((x) >= (y) ? (x) : (y))
@@ -171,8 +170,7 @@ void arena_free(Arena *arena);
 // Not really something you'd use in a real program but useful for testing.
 void arena_free_all(void);
 
-#define arena_alloc(arena, type)                                                                   \
-    (type *)arena_alloc_size(arena, sizeof(type), _Alignof(type))
+#define arena_alloc(arena, type) (type *)arena_alloc_size(arena, sizeof(type), _Alignof(type))
 U8 *arena_alloc_size(Arena *arena, Size size, Offset align);
 
 // Get the size of the arena (not including the arena struct itself).
@@ -331,7 +329,7 @@ U8Array *arena__clone_arr(Arena *arena, U8Array *array, Size item_size);
 // * To get a String view of a c string, use the str macro.
 typedef Slice(U8) String;
 
-#define str(c_string) ((String){.len = strlen(c_string), .e = (U8*)c_string})
+#define str(c_string) ((String){.len = strlen(c_string), .e = (U8 *)c_string})
 #define cstr(a, s) arena__alloc_cstring((a), (s))
 
 typedef Array(String) StringArray;
@@ -379,11 +377,11 @@ struct Pool {
 
 #ifdef _WIN32
 
-#include <Windows.h>
 #include <Memoryapi.h>
+#include <Windows.h>
 
 // todo(steve): Can I set a pragma or whatever to link kernal32.lib?
-//#pragma comment(lib, "kernel32.lib")
+// #pragma comment(lib, "kernel32.lib")
 
 static Size memory__page_size(void) {
     SYSTEM_INFO sys_info;
@@ -572,8 +570,7 @@ U8 *arena__clone_slice(Arena *arena, U8Slice *slice, Size item_size) {
 }
 
 U8Array *arena__alloc_array(Arena *arena, Size item_size, U64 cap) {
-    U8Array *array =
-        (U8Array *)arena_alloc_size(arena, sizeof(U8Array) + item_size * cap, 16);
+    U8Array *array = (U8Array *)arena_alloc_size(arena, sizeof(U8Array) + item_size * cap, 16);
     array->len = 0;
     array->cap = cap;
     return array;
@@ -629,7 +626,7 @@ String format(Arena *a, const char *fmt, ...) {
     char *c = (char *)arena_alloc_size(a, len + 1, _Alignof(char));
     vsnprintf(c, len + 1, fmt, args);
     va_end(args);
-    return (String){.len = len, .e = (U8*)c};
+    return (String){.len = len, .e = (U8 *)c};
 }
 
 StringSlice str_split(Arena *a, String s, char sep) {
@@ -853,7 +850,6 @@ static void test_rel_ptr(void) {
     arena_free_all();
 }
 
-
 static void test_slices(void) {
     Arena *a = arena_acquire();
 
@@ -1041,27 +1037,27 @@ static void test_strings(void) {
     // format
     String s1 = format(a, "Hello %d %s", 42, "World");
     assert(s1.len == 14);
-    assert(strncmp((const char*)s1.e, "Hello 42 World", s1.len) == 0);
+    assert(strncmp((const char *)s1.e, "Hello 42 World", s1.len) == 0);
 
     // split
     String s2 = str("apple,banana,cherry");
     StringSlice parts = str_split(a, s2, ',');
     assert(parts.len == 3);
-    assert(strncmp((const char*)parts.e[0].e, "apple", parts.e[0].len) == 0);
-    assert(strncmp((const char*)parts.e[1].e, "banana", parts.e[1].len) == 0);
-    assert(strncmp((const char*)parts.e[2].e, "cherry", parts.e[2].len) == 0);
+    assert(strncmp((const char *)parts.e[0].e, "apple", parts.e[0].len) == 0);
+    assert(strncmp((const char *)parts.e[1].e, "banana", parts.e[1].len) == 0);
+    assert(strncmp((const char *)parts.e[2].e, "cherry", parts.e[2].len) == 0);
 
     String s3 = str(",banana,cherry");
     parts = str_split(a, s3, ',');
     assert(parts.len == 2);
-    assert(strncmp((const char*)parts.e[0].e, "banana", parts.e[1].len) == 0);
-    assert(strncmp((const char*)parts.e[1].e, "cherry", parts.e[2].len) == 0);
+    assert(strncmp((const char *)parts.e[0].e, "banana", parts.e[1].len) == 0);
+    assert(strncmp((const char *)parts.e[1].e, "cherry", parts.e[2].len) == 0);
 
     String s4 = str("banana,cherry,");
     parts = str_split(a, s4, ',');
     assert(parts.len == 2);
-    assert(strncmp((const char*)parts.e[0].e, "banana", parts.e[1].len) == 0);
-    assert(strncmp((const char*)parts.e[1].e, "cherry", parts.e[2].len) == 0);
+    assert(strncmp((const char *)parts.e[0].e, "banana", parts.e[1].len) == 0);
+    assert(strncmp((const char *)parts.e[1].e, "cherry", parts.e[2].len) == 0);
 
     String s5 = str(",");
     parts = str_split(a, s5, ',');
