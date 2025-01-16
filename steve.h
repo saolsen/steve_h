@@ -95,20 +95,7 @@
 #define ALIGN_DOWN_PTR(p, a) ((void *)ALIGN_DOWN((ptrdiff_t)(p), (a)))
 #define ALIGN_UP_PTR(p, a) ((void *)ALIGN_UP((ptrdiff_t)(p), (a)))
 
-uint64_t pow2_next(uint64_t i) {
-    if (i == 0) {
-        return 0;
-    }
-    i--;
-    i |= i >> 1;
-    i |= i >> 2;
-    i |= i >> 4;
-    i |= i >> 8;
-    i |= i >> 16;
-    i |= i >> 32;
-    i++;
-    return i;
-}
+uint64_t pow2_next(uint64_t i);
 
 // memcpy wrapper so we don't have to include sting.h in the header.
 // @todo(steve): Tie in with future error handling.
@@ -354,6 +341,7 @@ struct Pool {
 
 #ifdef STEVE_IMPLEMENTATION
 // NOLINTBEGIN(modernize-use-nullptr)
+// ReSharper disable CppNonInlineFunctionDefinitionInHeaderFile
 
 #include <assert.h>
 #include <stdarg.h>
@@ -434,6 +422,21 @@ static void memory__free(uint8_t *addr) {
 }
 
 #endif
+
+uint64_t pow2_next(uint64_t i) {
+    if (i == 0) {
+        return 0;
+    }
+    i--;
+    i |= i >> 1;
+    i |= i >> 2;
+    i |= i >> 4;
+    i |= i >> 8;
+    i |= i >> 16;
+    i |= i >> 32;
+    i++;
+    return i;
+}
 
 void *xmemcpy(void *dest, const void *src, ptrdiff_t n) {
     assert(n >= 0);
@@ -636,8 +639,6 @@ StringSlice str_split(Arena *a, String s, char sep) {
 // NOLINTBEGIN(modernize-use-nullptr)
 
 #include <assert.h>
-#include <stdio.h>
-#include <string.h>
 
 static void test_helpers(void);
 static void test_arena_acquire_release(void);
@@ -827,6 +828,7 @@ static void test_rel_ptr(void) {
     arena_release(a);
     arena_free_all();
 }
+
 
 static void test_slices(void) {
     Arena *a = arena_acquire();
