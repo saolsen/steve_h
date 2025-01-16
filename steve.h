@@ -104,8 +104,8 @@ STATIC_ASSERT(sizeof(Offset) == sizeof(I64));
 STATIC_ASSERT(sizeof(unsigned char) == sizeof(U8));
 STATIC_ASSERT(sizeof(char) == sizeof(I8));
 
-// These are what how other types match on apple silicon.
-// But this is not consistent accross platforms, so they shouldn't be used.
+// These are what how other types match on Apple Silicon.
+// But this is not consistent across platforms, so they shouldn't be used.
 //STATIC_ASSERT(sizeof(unsigned short) == sizeof(U16));
 //STATIC_ASSERT(sizeof(short) == sizeof(I16));
 //STATIC_ASSERT(sizeof(unsigned int) == sizeof(U32));
@@ -479,10 +479,8 @@ Arena *arena_acquire(void) {
 
     // Allocate a new arena.
     Size pagesize = memory__page_size(); // 16kb on my machine.
-    assert(pagesize >= 0);
     Size cap =
         pagesize * 4 * 1024 * 1024; // 64GB on my machine. @note(steve): probably way too much
-    assert(cap >= 0);
 
     U8 *addr = memory__reserve(cap);
     memory__commit(addr, pagesize); // commit first page
