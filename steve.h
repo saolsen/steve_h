@@ -89,9 +89,9 @@
 #define MAX(x, y) ((x) >= (y) ? (x) : (y))
 #define CLAMP_MAX(x, max) MIN(x, max)
 #define CLAMP_MIN(x, min) MAX(x, min)
-#define IS_POW2(x) (((x) != 0) && ((x) & ((x)-1)) == 0)
-#define ALIGN_DOWN(n, a) ((n) & ~((a)-1))
-#define ALIGN_UP(n, a) ALIGN_DOWN((n) + (a)-1, (a))
+#define IS_POW2(x) (((x) != 0) && ((x) & ((x) - 1)) == 0)
+#define ALIGN_DOWN(n, a) ((n) & ~((a) - 1))
+#define ALIGN_UP(n, a) ALIGN_DOWN((n) + (a) - 1, (a))
 #define ALIGN_DOWN_PTR(p, a) ((void *)ALIGN_DOWN((ptrdiff_t)(p), (a)))
 #define ALIGN_UP_PTR(p, a) ((void *)ALIGN_UP((ptrdiff_t)(p), (a)))
 
@@ -207,16 +207,13 @@ typedef struct {
     ptrdiff_t e;
 } RelSlice;
 
-#define slice_rel(arena, ptr_slice)                                                                \
-    { .len = (ptr_slice).len, .e = rel(arena, (ptr_slice).e) }
-#define slice_ptr(arena, rel_slice)                                                                \
-    { .len = (rel_slice).len, .e = ptr(arena, (rel_slice).e) }
+#define slice_rel(arena, ptr_slice) {.len = (ptr_slice).len, .e = rel(arena, (ptr_slice).e)}
+#define slice_ptr(arena, rel_slice) {.len = (rel_slice).len, .e = ptr(arena, (rel_slice).e)}
 
 #define arena_clone_slice(arena, slice)                                                            \
-    {                                                                                              \
-        .len = (slice).len, .e = (typeof((slice).e))arena__clone_slice(                            \
-                                arena, (U8Slice *)&(slice), (ptrdiff_t)sizeof(*((slice).e)))       \
-    }
+    {.len = (slice).len,                                                                           \
+     .e = (typeof((slice).e))arena__clone_slice(arena, (U8Slice *)&(slice),                        \
+                                                (ptrdiff_t)sizeof(*((slice).e)))}
 uint8_t *arena__clone_slice(Arena *arena, U8Slice *slice, ptrdiff_t item_size);
 
 // Array
@@ -261,8 +258,7 @@ U8Array *arena__grow_array(Arena *arena, U8Array *array, ptrdiff_t item_size, pt
     assert(n > 0);                                                                                 \
     arr__maybegrow(arena, array, !(array) ? (n) : (n) - (array)->len);                             \
     (array)->len = (n)
-#define arr_slice(array)                                                                           \
-    { .len = (array)->len, .e = (array)->e }
+#define arr_slice(array) {.len = (array)->len, .e = (array)->e}
 
 // This isn't strictly necessary for the array or arena arguments.
 // * For array, you wouldn't push to the result of a function call,
@@ -366,11 +362,73 @@ struct Pool {
 #include <string.h>
 
 #ifdef _WIN32
+
 #include <Windows.h>
+#include <Memoryapi.h>
+
 // todo(steve): Can I set a pragma or whatever to link kernal32.lib?
+//#pragma comment(lib, "kernel32.lib")
+
+ptrdiff_t memory__page_size(void) {
+    SYSTEM_INFO sys_info;
+    GetSystemInfo(&sys_info);
+    return sys_info.dwPageSize;
+}
+
+uint8_t *memory__reserve(ptrdiff_t size) {
+    void *r = VirtualAlloc(NULL, (size_t)size, MEM_RESERVE, PAGE_READWRITE);
+    if (r == NULL) {
+        // @todo(steve): Call GetLastError to get the error message.
+        perror("memory__reserve");
+        exit(1);
+    }
+    return r;
+}
+
+void memory__commit(uint8_t *addr, ptrdiff_t size) {
+    // addr should be the start of a page and size should be a multiple of the page size.
+    if (VirtualAlloc(addr, (size_t)size, MEM_COMMIT, PAGE_READWRITE) == 0) {
+        perror("memory__commit");
+        exit(1);
+    }
+}
+
+void memory__free(uint8_t *addr) {
+    if (VirtualFree(addr, 0, MEM_RELEASE) == 0) {
+        perror("memory__free");
+        exit(1);
+    }
+}
+
 #else
 #include <sys/mman.h>
 #include <unistd.h>
+
+ptrdiff_t memory__page_size(void) {
+    return sysconf(_SC_PAGE_SIZE);
+}
+
+uint8_t *memory__reserve(ptrdiff_t size) {
+    void *addr = mmap(NULL, (size_t)cap, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
+    if (addr == MAP_FAILED) {
+        perror("memory__reserve");
+        exit(1);
+    }
+    return addr;
+}
+
+void memory__commit(uint8_t *addr, ptrdiff_t size) {
+    // addr should be the start of a page and size should be a multiple of the page size.
+    if (mprotect(addr, size, PROT_READ | PROT_WRITE) == -1) {
+        perror("memory__commit");
+        exit(1);
+    }
+}
+
+void memory__free(uint8_t *addr) {
+
+}
+
 #endif
 
 void *xmemcpy(void *dest, const void *src, ptrdiff_t n) {
@@ -386,29 +444,21 @@ Arena *arena_acquire(void) {
     }
 
     // Allocate a new arena.
-    ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE); // 16kb on my machine.
+    ptrdiff_t pagesize = memory__page_size(); // 16kb on my machine.
     assert(pagesize >= 0);
     ptrdiff_t cap =
         pagesize * 4 * 1024 * 1024; // 64GB on my machine. @note(steve): probably way too much
     assert(cap >= 0);
-    // todo(steve): windows
+
     // VirtualAlloc(null, size, MEM_RESERVE, PAGE_READWRITE);
-    void *r = mmap(NULL, (size_t)cap, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
-    if (r == MAP_FAILED) {
-        perror("mmap");
-        exit(1);
-    }
+    uint8_t *addr = memory__reserve(cap);
     // commit first page
-    // @todo(steve): windows
-    // VirtualAlloc(first_uncommitted_page, size, MEM_COMMIT, PAGE_READWRITE);
-    if (mprotect(r, (size_t)pagesize, PROT_READ | PROT_WRITE) == -1) {
-        perror("Ran out of virtual memory");
-        exit(1);
-    }
-    Arena *arena = (Arena *)r;
-    arena->begin = (uint8_t *)(r);
-    arena->pos = (uint8_t *)(r) + sizeof(*arena);
-    arena->commit = (uint8_t *)(r) + pagesize;
+    memory__commit(addr, pagesize);
+
+    Arena *arena = (Arena *)addr;
+    arena->begin = (uint8_t *)(addr);
+    arena->pos = (uint8_t *)(addr) + sizeof(*arena);
+    arena->commit = (uint8_t *)(addr) + pagesize;
     return arena;
 }
 
@@ -428,14 +478,8 @@ void arena_release(Arena *arena) {
 }
 
 void arena_free(Arena *arena) {
-    // todo(steve): windows
-    // VirtualFree(arena->begin, 0, MEM_RELEASE);
-    ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE);
-    assert(pagesize >= 0);
-    if (munmap(arena->begin, (size_t)pagesize * 4 * 1024 * 1024) == -1) {
-        perror("munmap");
-        exit(1);
-    }
+
+    memory__free(arena->begin);
 }
 
 void arena_free_all(void) {
@@ -451,19 +495,17 @@ void arena_free_all(void) {
 uint8_t *arena_alloc_size(Arena *arena, ptrdiff_t size, ptrdiff_t align) {
     // Align Pointer
     uint8_t *start = (uint8_t *)ALIGN_UP_PTR(arena->pos, align);
+    uint8_t *new_pos = start + size;
 
     // Commit new page if needed.
-    uint8_t *new_pos = start + size;
-    while (new_pos > arena->commit) {
-        // todo(steve): windows
-        // VirtualAlloc(first_uncommitted_page, size, MEM_COMMIT, PAGE_READWRITE);
-        ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE);
-        assert(pagesize >= 0);
-        if (mprotect(arena->commit, (size_t)pagesize, PROT_READ | PROT_WRITE) == -1) {
-            perror("Ran out of virtual memory");
-            exit(1);
+    if (new_pos > arena->commit) {
+        uint8_t *new_commit = arena->commit;
+        ptrdiff_t pagesize = memory__page_size();
+        while (new_pos > new_commit) {
+            new_commit += pagesize;
         }
-        arena->commit += pagesize;
+        memory__commit(arena->commit, new_commit - arena->commit);
+        arena->commit = new_commit;
     }
     arena->pos = new_pos;
     return start;
@@ -749,7 +791,7 @@ static void test_arena_alloc_alignment(void) {
     }
 
     // Cross page boundary test
-    ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE);
+    ptrdiff_t pagesize = memory__page_size();
     (void)arena_alloc_size(a, pagesize + 1, 16);
 
     arena_release(a);
@@ -758,7 +800,7 @@ static void test_arena_alloc_alignment(void) {
 
 static void test_arena_large_alloc(void) {
     Arena *a = arena_acquire();
-    ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE);
+    ptrdiff_t pagesize = memory__page_size();
     ptrdiff_t big_size = pagesize * 5;
     void *big_block = arena_alloc_size(a, big_size, 16);
     assert(big_block != NULL);
@@ -888,7 +930,7 @@ static void test_dynamic_arrays(void) {
 
     // setlen
     // Length that puts us on a new page so that we know it worked if we can write to the end.
-    ptrdiff_t pagesize = sysconf(_SC_PAGE_SIZE);
+    ptrdiff_t pagesize = memory__page_size();
     arr_setlen(a, arr, pagesize + 200);
     assert(arr->len == pagesize + 200);
     arr->e[pagesize + 199] = 1234;
