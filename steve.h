@@ -389,9 +389,9 @@ struct Pool {
 #include <string.h>
 
 #ifdef _WIN32
+#include <Windows.h>
 
 #include <Memoryapi.h>
-#include <Windows.h>
 
 // todo(steve): Can I set a pragma or whatever to link kernal32.lib?
 // #pragma comment(lib, "kernel32.lib")
