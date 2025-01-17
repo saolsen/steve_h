@@ -1,23 +1,57 @@
+// steve.h                          ..
+//                                :. :--
+//                               -------: ----
+//                    ++++==----:--=+=--:-::---:
+//                    #::#*+====--*@@@=-.------:====**###
+//                    ####**====-=@@@@%-:-+@@@-.-==+*** #
+//                    ####*+=++=-*@@@@@---@@@@%.-+=+**###
+//                    ####*+++++-*@@@@@--+@@@@@--===**###
+//                   +#####+++=+--@@@@+---@@@@@--++=*####
+//                   -#####+++++=--@@#-*#-*@@@--*++=**###
+//                   -####*+++==*=----#*+*-----**++=**##*
+//                   -#####++++++*%%%#++++##*##*====####*
+//          =#**%    =######*++++++++++++=++*+++===*####+
+//        =##**#%#   =##################*##*##*##*######-
+//       -##*##%@#   +##################################:     %#*+
+//       %##**%%@#   +##################################     *@%**#*
+//      =%##**%@@=   *##################################     %%%#*##=
+//      %%%#*##%@    ########=:::::-----==+++*##########     @@@##*##
+//      @@@%###%%#+  #######*::.:-::...........=########  *##@@@%###%
+//      *#%@@@@@%%@  #######*:::####...........+########   @@@@@#**#%
+//      %##%@@#      #######+:::####::::::::...+########     +@##*##@
+//     +%##%@@%      #######+:::###*:::::::::::*########     +%####@+
+//     +%#*%%@%%=    ######%+::-###*:::::::::::*#######*    %%@%%%@%
+//     +%#**#%%+     #######=::=#%#+:::::::::::########*    :*%@@@@@
+//       @@@@@*      =====++-::::::::::::::::::##*++###*    *%#%@@@%
+//                          -++++-           --:::.....:-     @@@@@-
+//                       #%*+**#@%%%#     *%*+-::.......::-   :@@#
+//                     =-:::.....:%@#     %%*+=-::::::::.::-
+//                    +=-::::....:=@%     @#**==-:::::::::-==
+//                    *=---::::::-+**     @%#**=----:::::---+
+//                    *++==-----=+**      *###*+=--:::::::--=
+//                   =**++======+**+      ##**+=--::::::-:--=-
+//                   +#+=::::::::=+=                  -
+//
 // Single header file library for C.
 // * Provides an arena allocator and some data structures that use it.
 // * Requires c11 or c23. Tested on gcc and clang on macos and linux.
 //   @todo: support mingw64, clang and msvc on windows.
 //   @todo: support and test on cosmocc.
 //
-// * Maintains a (thread local) pool of arenas so they are cheap to acquire and release for
-//   temporary allocations.
+// * Arena for allocating memory.
 //   Since all allocations are backed by arenas you don't have to free anything individually, just
 //   use an arena that matches the lifetime of the data.
+// * Thread local scratch arena for cheap temporary allocations within functions.
 // * Includes data structures like a dynamic array that work well with the arena.
 //   * Allows for some optimizations like extending instead of reallocing if the array is on the end
 //   of an arena.
 
 // * Rules of thumb.
 //   * If a function returns something that needs to be allocated, it should take an arena to
-//   allocate the result on.
-//   * You should never return something allocated on an arena that wasn't passed in.
+//     allocate the result on.
+//   * You should never return something allocated on the scratch arena.
 //   * If a function needs to allocate temporary memory,
-//     it should acquire its own arena and release it before returning.
+//     it should acquire the scratch arena and release it before returning.
 
 // * Things to add.
 //   * HashMap.
@@ -59,7 +93,7 @@
 //   * Windows
 //     * mingw64 (not sure the c versions supported)
 //     * clang (c11 and c23)
-//     * msvc (c11 and c17)
+//     * @todo: msvc (c11 and c17)
 //   * @todo(steve): Support SDL instead of stdlib for all these platforms.
 //   * @todo(steve): Support cosmocc.
 //   * @todo(steve): Support zigc.
@@ -148,11 +182,6 @@ void *xmemcpy(void *dest, const void *src, Size n);
 // * An arena is a continuous block of memory that can grow up to a certain size.
 // * They currently have a max capacity of 1024*1024 pages. On my m1 mac that's 64GB.
 //   This is probably too big. @todo(steve): Make this configurable.
-// * There is a thread_local pool of arenas.
-//   when they are released their memory is not returned to the operating system,
-//   but they are reset and available for use again.
-// * This makes arena_acquire a cheap operation so they can be used both for long-lived things
-//   and for temporary allocations within a function.
 // * Arenas are not thread safe so multiple threads should not use the same arena at the same time.
 // * This only works on 64 bit systems where pointers are 64 bits.
 typedef struct Arena Arena;
@@ -160,7 +189,7 @@ struct Arena {
     U8 *begin;
     U8 *pos;
     U8 *commit;
-    Arena *next_free;
+    U64 refcount;
 };
 // * The way an arena works is it allocates the big block of memory and starts allocations at
 //   begin + sizeof(Arena).
@@ -169,19 +198,25 @@ struct Arena {
 // * Arena happens to be 4 pointers so this works well, static assert here to catch if that changes.
 STATIC_ASSERT(sizeof(Arena) % 16 == 0);
 
-// Pool of already allocated arenas that aren't in use. This lets us reuse arenas for small
-// (temp/scratch) allocations without having to pass them around or pay the cost of allocating a new
-// one each time.
-THREAD_LOCAL_STATIC Arena *arena__free_list = NULL;
-
-Arena *arena_acquire(void);
+Arena *arena_new(void);
 void arena_reset(Arena *arena);
-void arena_release(Arena *arena);
 void arena_free(Arena *arena);
 
-// Release all the arenas in the pool.
-// Not really something you'd use in a real program but useful for testing.
-void arena_free_all(void);
+THREAD_LOCAL_STATIC Arena *scratch__arena = NULL;
+
+// Get a reference to the scratch arena.
+// There is a single scratch arena per thread.
+// The scratch arena keeps track of how many references there are to it.
+// It is only reset after all the references have released it.
+// This makes it's lifetime the lifetime of the outermost use of it.
+// Depending on the program, this can be bad if you are using it in a long-lived context for a lot
+// of temp memory. Consider manually creating and freeing an arena in that case.
+Arena *scratch_acquire(void);
+// Release reference to the scratch arena. Will be reset if there are no other references.
+void scratch_release(void);
+// Manually free all scratch memory.
+// Useful if you know the allocation is big and nobody has a reference.
+void scratch_free();
 
 #define arena_alloc(arena, type) (type *)arena_alloc_size(arena, sizeof(type), _Alignof(type))
 U8 *arena_alloc_size(Arena *arena, Size size, Offset align);
@@ -191,7 +226,7 @@ Size arena_size(Arena *arena);
 
 // You can copy and restore all the data in an area by copying the memory buffer.
 // This can be very powerful for cloning arbitrary data structures.
-// If you have a data structure you want to clone and it only uses relative pointers, than you
+// If you have a data structure you want to clone, and it only uses relative pointers, then you
 // can dedicate an arena to it and use arena_serialize and arena_deserialize to clone it.
 // Buf must have space for arena_size(arena) bytes.
 void arena_serialize(void *buf, Arena *arena);
@@ -290,9 +325,9 @@ U8Array *arena__grow_array(Arena *arena, U8Array *array, Size item_size, U64 amo
 // * For array, you wouldn't push to the result of a function call,
 //   That would just throw away the result.
 //     eg: arr_push(arena, get_array(), 1);
-// * For arena, it'd be bad to pass arena_acquire() because you'd lose the arena reference and leak
-//   the whole thing.
-//     eg: arr_push(arena_acquire(), a, 1);
+// * For arena, it'd be bad to pass scratch_acquire() or arena_new() because you'd lose the arena
+//   reference and leak the whole thing.
+//     eg: arr_push(arena_new(), a, 1);
 // * It is however important for the n argument in case it's something like ++i
 //   In that case we don't want to evaluate it twice.
 #define arr__maybegrow(arena, array, n)                                                            \
@@ -315,14 +350,13 @@ U8Array *arena__clone_arr(Arena *arena, U8Array *array, Size item_size);
 // * An array contains the array data, so it's a buffer with metadata. The buffer is almost always
 //   in the arena so you typically have pointers to arrays.
 // * A slice is a pointer with some metadata. That makes it a fancy pointer so you usually use it as
-// a value
-//   rather than a pointer to a slice.
+//   a value rather than a pointer to a slice.
 // * Many times you'd want to pass an array to a function that takes a slice. Use the slice macro to
 //   do that.
 // * You can't alter slices, so these functions treat them as const.
 //   * There's no slice -> array converter
 //     * There's no guarantees about where the data the slice points to is stored so you don't want
-//     to modify it.
+//       to modify it.
 //     * If you want to pass an array and use it as an array, just pass an array pointer.
 //     * If you want to create an array from a slice (by copying the data), you can use
 //     arena_push_slice.
@@ -331,7 +365,7 @@ U8Array *arena__clone_arr(Arena *arena, U8Array *array, Size item_size);
 // * It's length doesn't include a null terminator and there's no guarantee that there is a null
 //   terminator.
 //   * When it's a view into another string like in a parser or something, there definitely won't be
-//   one.
+//     one.
 //   * If it's allocated in an arena with one of the functions here, there usually is a null
 //   terminator, because it's easier to inspect in the debugger. But this is not a property you can
 //   rely on in code!
@@ -393,7 +427,7 @@ struct Pool {
 
 #include <Memoryapi.h>
 
-// todo(steve): Can I set a pragma or whatever to link kernal32.lib?
+// todo(steve): For future msvc, can I set a pragma or whatever to link kernal32.lib?
 // #pragma comment(lib, "kernel32.lib")
 
 static Size memory__page_size(void) {
@@ -481,13 +515,7 @@ void *xmemcpy(void *dest, const void *src, Size n) {
     return memcpy(dest, src, n);
 }
 
-Arena *arena_acquire(void) {
-    if (arena__free_list) {
-        Arena *arena = arena__free_list;
-        arena__free_list = arena->next_free;
-        return arena;
-    }
-
+Arena *arena_new(void) {
     // Allocate a new arena.
     Size pagesize = memory__page_size(); // 16kb on my machine.
     Size cap =
@@ -500,36 +528,58 @@ Arena *arena_acquire(void) {
     arena->begin = addr;
     arena->pos = addr + sizeof(*arena);
     arena->commit = addr + pagesize;
+    arena->refcount = 0;
     return arena;
 }
 
 void arena_reset(Arena *arena) {
+    if (arena->refcount > 0) {
+        perror("arena_reset: Arena is in use by other functions. If this is scratch call "
+               "scratch_release.");
+        exit(1);
+    }
+    // @todo(steve): On windows, decommit all the pages after the first one.
     arena->pos = arena->begin + sizeof(*arena);
 }
 
-void arena_release(Arena *arena) {
-    // @opt(steve): If we have a lot of pages committed, we could free it
-    //   and then create a new virtual allocation the next time it's used.
-    //   On windows, you can "uncommit" pages but not on posix.
-    // @todo(steve): windows
-    //
-    arena_reset(arena);
-    arena->next_free = arena__free_list;
-    arena__free_list = arena;
-}
-
 void arena_free(Arena *arena) {
+    if (arena->refcount > 0) {
+        perror("arena_free: Arena is in use by other functions. If this is scratch call "
+               "scratch_release");
+        exit(1);
+    }
     memory__free(arena->begin);
 }
 
-void arena_free_all(void) {
-    Arena *arena = arena__free_list;
-    while (arena) {
-        Arena *next = arena->next_free;
-        arena_free(arena);
-        arena = next;
+Arena *scratch_acquire(void) {
+    if (scratch__arena == NULL) {
+        scratch__arena = arena_new();
     }
-    arena__free_list = NULL;
+    scratch__arena->refcount++;
+    return scratch__arena;
+}
+
+void scratch_release(void) {
+    if (scratch__arena == NULL) {
+        perror("scratch_release: No scratch arena to release.");
+        exit(1);
+    }
+    scratch__arena->refcount--;
+    if (scratch__arena->refcount == 0) {
+        arena_reset(scratch__arena);
+    }
+}
+
+void scratch_free(void) {
+    if (scratch__arena == NULL) {
+        return;
+    }
+    if (scratch__arena->refcount > 0) {
+        perror("scratch_free: Scratch arena is in use by other functions.");
+        exit(1);
+    }
+    arena_free(scratch__arena);
+    scratch__arena = NULL;
 }
 
 U8 *arena_alloc_size(Arena *arena, Size size, Offset align) {
@@ -560,13 +610,21 @@ Size arena_size(Arena *arena) {
 }
 
 void arena_serialize(void *buf, Arena *arena) {
+    if (arena->refcount > 0) {
+        perror(
+            "arena_serialize: Arena is in use by other functions. You cannot serialize scratch.");
+        exit(1);
+    }
     xmemcpy(buf, arena->begin + sizeof(Arena), arena_size(arena));
 }
 
 // Note: This only works on an empty arena, if the arena passed in is not empty it will get reset.
 // @todo(steve): Return an error or something instead of just resetting the arena.
 void arena_deserialize(Arena *arena, void *buf, Size size) {
-    arena_reset(arena);
+    if (arena_size(arena) > 0) {
+        perror("arena_deserialize: Arena is not empty. You must pass in an empty arena.");
+        exit(1);
+    }
     U8 *data = arena_alloc_size(arena, size, 1);
     xmemcpy(data, buf, size);
 }
@@ -756,27 +814,29 @@ static void test_helpers(void) {
 }
 
 static void test_arena_acquire_release(void) {
-    // Acquire a single arena and release it
-    Arena *a = arena_acquire();
+    // Acquire a single arena and reset it
+    Arena *a = arena_new();
     assert(a != NULL);
-    arena_release(a);
+    arena_reset(a);
 
     // Acquire multiple arenas
-    Arena *a1 = arena_acquire();
-    Arena *a2 = arena_acquire();
-    assert(a1 != NULL && a2 != NULL);
-    arena_release(a1);
-    arena_release(a2);
+    Arena *scratch = scratch_acquire();
+    assert(scratch != NULL);
+    scratch_release();
 
-    // Acquire again to ensure reuse
-    Arena *a3 = arena_acquire();
-    assert(a3 == a1 || a3 == a2); // Freed arenas should be reused.
-    arena_release(a3);
-    arena_free_all();
+    // Acquire again to ensure same arena.
+    Arena *scratch_2 = scratch_acquire();
+    Arena *scratch_3 = scratch_acquire();
+    assert(scratch_2 == scratch_3);
+    assert(scratch_2->refcount == 2);
+    scratch_release();
+    assert(scratch_2->refcount == 1);
+    scratch_release();
+    assert(scratch__arena->refcount == 0);
 }
 
 static void test_arena_reset(void) {
-    Arena *a = arena_acquire();
+    Arena *a = arena_new();
     // Allocate some memory
     I32 *x = arena_alloc(a, I32);
     *x = 42;
@@ -793,31 +853,18 @@ static void test_arena_reset(void) {
 
     // Pointers should be to the same memory.
     assert(y == x);
-    arena_release(a);
-    arena_free_all();
+    arena_free(a);
 }
 
 static void test_arena_free(void) {
-    Arena *a = arena_acquire();
+    Arena *a = arena_new();
     I32 *x = arena_alloc(a, I32);
     *x = 123;
-    arena_free(a); // Should succeed without error.
-
-    // Also test arena_free_all
-    Arena *a1 = arena_acquire();
-    Arena *a2 = arena_acquire();
-    arena_release(a1);
-    arena_release(a2);
-    arena_free_all();
-    assert(arena__free_list == NULL);
-
-    Arena *a3 = arena_acquire();
-    arena_release(a3);
-    arena_free_all();
+    arena_free(a);
 }
 
 static void test_arena_alloc_alignment(void) {
-    Arena *a = arena_acquire();
+    Arena *a = arena_new();
 
     // Test alignment for 1, 2, 4, 16
     Offset alignments[] = {1, 2, 4, 16};
@@ -831,12 +878,11 @@ static void test_arena_alloc_alignment(void) {
     Size pagesize = memory__page_size();
     (void)arena_alloc_size(a, pagesize + 1, 16);
 
-    arena_release(a);
-    arena_free_all();
+    arena_free(a);
 }
 
 static void test_arena_large_alloc(void) {
-    Arena *a = arena_acquire();
+    Arena *a = arena_new();
     Size pagesize = memory__page_size();
     Size big_size = pagesize * 5;
     void *big_block = arena_alloc_size(a, big_size, 16);
@@ -844,12 +890,11 @@ static void test_arena_large_alloc(void) {
     // Mke sure we can write to it.
     memset(big_block, 0xAB, big_size);
 
-    arena_release(a);
-    arena_free_all();
+    arena_free(a);
 }
 
 static void test_rel_ptr(void) {
-    Arena *a = arena_acquire();
+    Arena *a = arena_new();
     I32 *x = arena_alloc(a, I32);
     *x = 55;
     Offset offset = rel(a, x);
@@ -857,12 +902,11 @@ static void test_rel_ptr(void) {
     assert(x == y);
     assert(*y == 55);
 
-    arena_release(a);
-    arena_free_all();
+    arena_free(a);
 }
 
 static void test_slices(void) {
-    Arena *a = arena_acquire();
+    Arena *a = arena_new();
 
     // Create an array
     typedef Array(I32) I32Array;
@@ -880,7 +924,7 @@ static void test_slices(void) {
     }
 
     // Clone slice
-    Arena *a2 = arena_acquire();
+    Arena *a2 = arena_new();
     I32Slice clone = arena_clone_slice(a2, s);
     assert(clone.len == s.len);
     for (I32 i = 0; i < 5; i++) {
@@ -891,13 +935,12 @@ static void test_slices(void) {
     // Cloned slice remains unaffected
     assert(clone.e[0] == 0);
 
-    arena_release(a);
-    arena_release(a2);
-    arena_free_all();
+    arena_free(a);
+    arena_free(a2);
 }
 
 static void test_rel_slices(void) {
-    Arena *a = arena_acquire();
+    Arena *a = arena_new();
 
     // Create an array
     typedef Array(I32) I32Array;
@@ -925,15 +968,14 @@ static void test_rel_slices(void) {
         assert(s2.e[i] == i * 10);
     }
 
-    arena_release(a);
-    arena_free_all();
+    arena_free(a);
 }
 
 static void test_dynamic_arrays(void) {
     typedef Array(I32) I32Array;
     typedef Slice(I32) I32Slice;
 
-    Arena *a = arena_acquire();
+    Arena *a = arena_new();
 
     // alloc_array
     I32Array *arr = arena_alloc_array(a, I32Array, I32, 15);
@@ -973,21 +1015,20 @@ static void test_dynamic_arrays(void) {
     arr->e[pagesize + 199] = 1234;
 
     // clone_array
-    Arena *a2 = arena_acquire();
+    Arena *a2 = arena_new();
     I32Array *clone = arena_clone_arr(a2, arr);
     assert(clone->len == arr->len);
     for (U32 i = 0; i < arr->len; i++) {
         assert(clone->e[i] == arr->e[i]);
     }
 
-    arena_release(a);
-    arena_release(a2);
-    arena_free_all();
+    arena_free(a);
+    arena_free(a2);
 }
 
 static void test_arena_serialize(void) {
     // @todo(steve): Test relative pointers and relative slices here.
-    Arena *a = arena_acquire();
+    Arena *a = arena_new();
     typedef Array(I32) I32Array;
     typedef Slice(I32) I32Slice;
     I32Array *arr = NULL;
@@ -1003,7 +1044,7 @@ static void test_arena_serialize(void) {
     arena_serialize(buf, a);
 
     // Deserialize
-    Arena *copy = arena_acquire();
+    Arena *copy = arena_new();
     arena_deserialize(copy, buf, size);
 
     // Check data
@@ -1021,7 +1062,7 @@ static void test_arena_serialize(void) {
     }
     free(buf);
 
-    Arena *copy2 = arena_acquire();
+    Arena *copy2 = arena_new();
     arena_clone(copy2, a);
     arr_copy = ptr(copy2, arr_rel);
     I32Slice s_copy2 = slice_ptr(copy2, s_rel);
@@ -1036,14 +1077,13 @@ static void test_arena_serialize(void) {
         assert(s_copy2.e[i] == i * 10);
     }
 
-    arena_release(a);
-    arena_release(copy);
-    arena_release(copy2);
-    arena_free_all();
+    arena_free(a);
+    arena_free(copy);
+    arena_free(copy2);
 }
 
 static void test_strings(void) {
-    Arena *a = arena_acquire();
+    Arena *a = arena_new();
 
     // format
     String s1 = format(a, "Hello %d %s", 42, "World");
@@ -1082,8 +1122,7 @@ static void test_strings(void) {
     char *c = cstr(a, &s2);
     assert(strcmp(c, "apple,banana,cherry") == 0);
 
-    arena_release(a);
-    arena_free_all();
+    arena_free(a);
 }
 
 // NOLINTEND(modernize-use-nullptr)
