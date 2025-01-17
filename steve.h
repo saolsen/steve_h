@@ -34,8 +34,8 @@
 //
 // Single header file library for C.
 // * Provides an arena allocator and some data structures that use it.
-// * Requires c11 or c23. Tested on gcc and clang on macos and linux.
-//   @todo: support mingw64, clang and msvc on windows.
+// * Requires c11 or c23. Tested on gcc and clang on macos, linux and windows.
+//   @todo: msvc on windows.
 //   @todo: support and test on cosmocc.
 //
 // * Arena for allocating memory.
@@ -49,9 +49,9 @@
 // * Rules of thumb.
 //   * If a function returns something that needs to be allocated, it should take an arena to
 //     allocate the result on.
-//   * You should never return something allocated on the scratch arena.
 //   * If a function needs to allocate temporary memory,
-//     it should acquire the scratch arena and release it before returning.
+//     it should acquire the scratch arena and release it before returning. p
+//   * You should never return something allocated on the scratch arena.
 
 // * Things to add.
 //   * HashMap.
@@ -1006,6 +1006,13 @@ static void test_dynamic_arrays(void) {
     assert(arr->e[110] == 999);
     assert(arr->e[111] == 1000);
     assert(arr->e[112] == 1001);
+    
+    // arr_push_array
+    arr_push_array(a, arr, arr);
+    assert(arr->len == 113 * 2);
+    assert(arr->e[113] == 0);
+    assert(arr->e[114] == 1);
+    assert(arr->e[115] == 2);
 
     // setlen
     // Length that puts us on a new page so that we know it worked if we can write to the end.
