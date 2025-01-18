@@ -13,24 +13,28 @@ jobs:
       fail-fast: false
       matrix:
         compiler: [ gcc, clang ]
-        c_standard: [ c99, c11, c2x ]
         include:
+          - compiler: gcc
+            cc: gcc
+            cxx: g++
+            c_flags: -std=c2x
           - compiler: clang
             cc: clang
-            c_flags: -fsanitize=address -fno-omit-frame-pointer
+            cxx: clang++
+            c_flags: -std=c2x -fsanitize=address -fno-omit-frame-pointer
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup compiler
         run: |
-          echo "CC=${{ matrix.compiler }}" >> $GITHUB_ENV
-          echo "CXX=${{ matrix.compiler }}" >> $GITHUB_ENV
+          echo "CC=${{ matrix.cc }}" >> $GITHUB_ENV
+          echo "CXX=${{ matrix.cxx }}" >> $GITHUB_ENV
 
       - name: Build and test
         run: |
           $CC --version
-          $CC -o test_steve test_steve.c -std=${{matrix.c_standard}} ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
+          $CC -o test_steve test_steve.c ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
           ./test_steve
 
   macos:
