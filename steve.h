@@ -713,6 +713,18 @@ U8Array *arena__grow_array(Arena *arena, U8Array *array, Size item_size, U64 amo
             U8Array *new_array = arena__alloc_array(arena, item_size, new_cap);
             new_array->len = array->len;
             xmemcpy(new_array->e, array->e, new_array->len * item_size);
+
+            // Mark the old array as dead. This helps catch reads and writes from a non updated list
+            // pointer. There is one issue though which is that if you use serialize/deserialize
+            // on an arena that has a dead array, it will trigger asan.
+            // I actually like that though, because it means you need to be more explicit about what
+            // you put in an arena that you're serializing.
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+            ASAN_POISON_MEMORY_REGION(array, sizeof(*array) + array->cap * item_size);
+#endif
+#endif
+
             return new_array;
         }
     }
