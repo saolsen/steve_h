@@ -35,8 +35,6 @@
 // Single header file library for C.
 // * Provides an arena allocator and some data structures that use it.
 // * Requires c11 or c23. Tested on gcc and clang on macos, linux and windows.
-//   @todo: msvc on windows.
-//   @todo: support and test on cosmocc.
 //
 // * Arena for allocating memory.
 //   Since all allocations are backed by arenas you don't have to free anything individually, just
@@ -93,14 +91,14 @@
 //   * Windows
 //     * mingw64 (not sure the c versions supported)
 //     * clang (c11 and c23)
-//     * @todo: msvc (c11 and c17)
-//   * @todo(steve): Support SDL instead of stdlib for all these platforms.
+//   * @todo: Support msvc (c11 and c17)
 //   * @todo(steve): Support cosmocc.
 //   * @todo(steve): Support zigc.
-//   * @todo(steve): Does stuff like tinycc support at least c11? If so maybe support those too.
+//   * @todo(steve): Support SDL instead of stdlib for all these platforms.
 // * One block like this should figure out the compiler and set some easier to switch on defines.
 //     eg: STEVE_MACOS_CLANG_C23
 //   I can maybe look at other projects like sdl to see how they do this.
+
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202302L)
 #define STATIC_ASSERT(exp) static_assert(exp)
 #define THREAD_LOCAL_STATIC thread_local static
