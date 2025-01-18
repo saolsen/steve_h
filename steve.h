@@ -496,6 +496,12 @@ static void memory__free(U8 *addr) {
 
 #endif
 
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#include <sanitizer/asan_interface.h>
+#endif
+#endif
+
 U64 pow2_next(U64 i) {
     if (i == 0) {
         return 0;
@@ -529,6 +535,13 @@ Arena *arena_new(void) {
     arena->pos = addr + sizeof(*arena);
     arena->commit = addr + pagesize;
     arena->refcount = 0;
+
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+    ASAN_POISON_MEMORY_REGION(arena->pos, arena->commit - arena->pos);
+#endif
+#endif
+
     return arena;
 }
 
@@ -540,6 +553,12 @@ void arena_reset(Arena *arena) {
     }
     // @todo(steve): On windows, decommit all the pages after the first one.
     arena->pos = arena->begin + sizeof(*arena);
+
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+    ASAN_POISON_MEMORY_REGION(arena->pos, arena->commit - arena->pos);
+#endif
+#endif
 }
 
 void arena_free(Arena *arena) {
@@ -548,7 +567,15 @@ void arena_free(Arena *arena) {
                "scratch_release");
         exit(1);
     }
-    memory__free(arena->begin);
+    arena_reset(arena);
+    void *addr = arena->begin;
+    memory__free(addr);
+
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+    ASAN_POISON_MEMORY_REGION(addr, sizeof(Arena));
+#endif
+#endif
 }
 
 Arena *scratch_acquire(void) {
@@ -587,6 +614,12 @@ U8 *arena_alloc_size(Arena *arena, Size size, Offset align) {
     U8 *start = (U8 *)ALIGN_UP_PTR(arena->pos, align);
     U8 *new_pos = start + size;
 
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+    ASAN_UNPOISON_MEMORY_REGION(start, new_pos - start);
+#endif
+#endif
+
     // Commit new page if needed.
     if (new_pos > arena->commit) {
         U8 *new_commit = arena->commit;
@@ -598,6 +631,13 @@ U8 *arena_alloc_size(Arena *arena, Size size, Offset align) {
         arena->commit = new_commit;
     }
     arena->pos = new_pos;
+
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+    ASAN_POISON_MEMORY_REGION(arena->pos, arena->commit - arena->pos);
+#endif
+#endif
+
     return start;
 }
 
@@ -1006,7 +1046,7 @@ static void test_dynamic_arrays(void) {
     assert(arr->e[110] == 999);
     assert(arr->e[111] == 1000);
     assert(arr->e[112] == 1001);
-    
+
     // arr_push_array
     arr_push_array(a, arr, arr);
     assert(arr->len == 113 * 2);

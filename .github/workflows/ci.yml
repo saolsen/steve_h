@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [gcc, clang]
+        compiler: [ gcc, clang ]
         include:
           - compiler: gcc
             cc: gcc
@@ -21,28 +21,28 @@ jobs:
           - compiler: clang
             cc: clang
             cxx: clang++
-            c_flags: -std=c2x
+            c_flags: -std=c2x -fsanitize=address -fno-omit-frame-pointer
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup compiler
-      run: |
-        echo "CC=${{ matrix.cc }}" >> $GITHUB_ENV
-        echo "CXX=${{ matrix.cxx }}" >> $GITHUB_ENV
+      - uses: actions/checkout@v4
 
-    - name: Build and test
-      run: |
-        $CC --version
-        $CC -o test_steve test_steve.c ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
-        ./test_steve
+      - name: Setup compiler
+        run: |
+          echo "CC=${{ matrix.cc }}" >> $GITHUB_ENV
+          echo "CXX=${{ matrix.cxx }}" >> $GITHUB_ENV
+
+      - name: Build and test
+        run: |
+          $CC --version
+          $CC -o test_steve test_steve.c ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
+          ./test_steve
 
   macos:
     runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
-        compiler: [gcc, clang]
+        compiler: [ gcc, clang ]
         include:
           - compiler: gcc
             cc: gcc
@@ -51,21 +51,23 @@ jobs:
           - compiler: clang
             cc: clang
             cxx: clang++
-            c_flags: -std=c2x
+            c_flags: -std=c2x -fsanitize=address -fno-omit-frame-pointer
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup compiler
-      run: |
-        echo "CC=${{ matrix.cc }}" >> $GITHUB_ENV
-        echo "CXX=${{ matrix.cxx }}" >> $GITHUB_ENV
+      - uses: actions/checkout@v4
 
-    - name: Build and test
-      run: |
-        $CC --version
-        $CC -o test_steve test_steve.c ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
-        ./test_steve
+      - name: Setup compiler
+        run: |
+          echo "CC=${{ matrix.cc }}" >> $GITHUB_ENV
+          echo "CXX=${{ matrix.cxx }}" >> $GITHUB_ENV
+
+      - name: Build and test
+        env:
+          MallocNanoZone: 0
+        run: |
+          $CC --version
+          $CC -o test_steve test_steve.c ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
+          ./test_steve
 
   windows:
     runs-on: windows-latest
@@ -73,44 +75,44 @@ jobs:
       fail-fast: false
       matrix:
         include:
-#          - compiler: msvc
-#            cc: cl
-#            c_flags: /std:c23
+          #          - compiler: msvc
+          #            cc: cl
+          #            c_flags: /std:c23
           - compiler: gcc
             cc: gcc
             c_flags: -std=gnu2x
           - compiler: clang
             cc: clang
-            c_flags: -std=c2x
+            c_flags: -std=c2x -fsanitize=address -fno-omit-frame-pointer
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Setup MSVC
-      if: matrix.compiler == 'msvc'
-      uses: ilammy/msvc-dev-cmd@v1
+      - name: Setup MSVC
+        if: matrix.compiler == 'msvc'
+        uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Set up MinGW
-      if: matrix.compiler == 'gcc'
-      uses: egor-tensin/setup-mingw@v2.2.0
-      with:
-        version: 12.2.0 
+      - name: Set up MinGW
+        if: matrix.compiler == 'gcc'
+        uses: egor-tensin/setup-mingw@v2.2.0
+        with:
+          version: 12.2.0
 
-    - name: Setup LLVM
-      if: matrix.compiler == 'clang'
-      uses: KyleMayes/install-llvm-action@v1
-      with:
-        version: "17.0"
+      - name: Setup LLVM
+        if: matrix.compiler == 'clang'
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: "17.0"
 
-    - name: Build and test with MSVC
-      if: matrix.compiler == 'msvc'
-      run: |
-        cl /Fe:test_steve.exe test_steve.c ${{ matrix.c_flags }} /W4 /WX
-        .\test_steve.exe
+      - name: Build and test with MSVC
+        if: matrix.compiler == 'msvc'
+        run: |
+          cl /Fe:test_steve.exe test_steve.c ${{ matrix.c_flags }} /W4 /WX
+          .\test_steve.exe
 
-    - name: Build and test with GCC/Clang
-      if: matrix.compiler != 'msvc'
-      run: |
-        ${{ matrix.cc }} --version
-        ${{ matrix.cc }} -o test_steve.exe test_steve.c ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
-        .\test_steve.exe
+      - name: Build and test with GCC/Clang
+        if: matrix.compiler != 'msvc'
+        run: |
+          ${{ matrix.cc }} --version
+          ${{ matrix.cc }} -o test_steve.exe test_steve.c ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
+          .\test_steve.exe
