@@ -530,6 +530,12 @@ Arena *arena_new(void) {
     U8 *addr = memory__reserve(cap);
     memory__commit(addr, pagesize); // commit first page
 
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+    ASAN_UNPOISON_MEMORY_REGION(addr, sizeof(Arena));
+#endif
+#endif
+
     Arena *arena = (Arena *)addr;
     arena->begin = addr;
     arena->pos = addr + sizeof(*arena);
