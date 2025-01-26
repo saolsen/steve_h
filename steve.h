@@ -120,26 +120,6 @@
 //     eg: STEVE_MACOS_CLANG_C23
 //   I can maybe look at other projects like sdl to see how they do this.
 
-// @todo(steve): mingw64 needs _Thread_local static
-
-#if 0
-
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202302L)
-#define STATIC_ASSERT(exp) static_assert(exp)
-#define THREAD_LOCAL_STATIC thread_local static
-#elif defined(__GNUC__) || defined(__clang__)
-#include <assert.h>
-#include <stdbool.h>
-#define STATIC_ASSERT(exp) _Static_assert(exp, #exp)
-#define THREAD_LOCAL_STATIC _Thread_local static
-#elif defined(_MSC_VER)
-#define THREAD_LOCAL_STATIC __declspec(thread)
-#define STATIC_ASSERT(exp) static_assert(exp, #exp)
-#else
-#error "Unsupported Compiler"
-#endif
-
-#endif
 
 // Primitive types.
 typedef uint8_t U8;
@@ -299,7 +279,7 @@ typedef struct {
 
 #define arena_clone_slice(arena, slice)                                                            \
     {.len = (slice).len,                                                                           \
-     .e = (typeof((slice).e))arena__clone_slice(arena, (U8Slice *)&(slice), sizeof(*((slice).e)))}
+     .e = (__typeof__((slice).e))arena__clone_slice(arena, (U8Slice *)&(slice), sizeof(*((slice).e)))}
 U8 *arena__clone_slice(Arena *arena, U8Slice *slice, Size item_size);
 
 // Array
@@ -358,17 +338,17 @@ U8Array *arena__grow_array(Arena *arena, U8Array *array, Size item_size, U64 amo
 #define arr__maybegrow(arena, array, n)                                                            \
     do {                                                                                           \
         Arena *_arena = (arena);                                                                   \
-        typeof(array) _array = (array);                                                            \
+        __typeof__(array) _array = (array);                                                        \
         Size _n = (n);                                                                             \
         if (!_array || _array->len + _n > _array->cap) {                                           \
-            _array = (typeof(_array))arena__grow_array(_arena, (U8Array *)_array,                  \
+            _array = (__typeof__(_array))arena__grow_array(_arena, (U8Array *)_array,              \
                                                        sizeof(_array->e[0]), _n);                  \
             (array) = _array;                                                                      \
         }                                                                                          \
     } while (0)
 
 #define arena_clone_arr(arena, array)                                                              \
-    (typeof(array))arena__clone_arr(arena, (U8Array *)(array), sizeof((array)->e[0]))
+    (__typeof__(array))arena__clone_arr(arena, (U8Array *)(array), sizeof((array)->e[0]))
 U8Array *arena__clone_arr(Arena *arena, U8Array *array, Size item_size);
 
 // Notes on Array vs Slice
