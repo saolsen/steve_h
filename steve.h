@@ -136,36 +136,12 @@ typedef size_t Size;
 typedef ptrdiff_t Offset;
 
 // Assert what these HAVE to be for the library to work.
-_Static_assert(sizeof(float) == sizeof(F32));
-_Static_assert(sizeof(double) == sizeof(F64));
-_Static_assert(sizeof(Size) == sizeof(U64));
-_Static_assert(sizeof(Offset) == sizeof(I64));
-_Static_assert(sizeof(unsigned char) == sizeof(U8));
-_Static_assert(sizeof(char) == sizeof(I8));
-_Static_assert(sizeof(U8) == 1);
-_Static_assert(sizeof(I8) == 1);
-_Static_assert(sizeof(U16) == 2);
-_Static_assert(sizeof(I16) == 2);
-_Static_assert(sizeof(U32) == 4);
-_Static_assert(sizeof(I32) == 4);
-_Static_assert(sizeof(U64) == 8);
-_Static_assert(sizeof(I64) == 8);
-_Static_assert(sizeof(F32) == 4);
-_Static_assert(sizeof(F64) == 8);
-_Static_assert(sizeof(Size) == 8);
-_Static_assert(sizeof(Offset) == 8);
-
-// These asserts show how the other standard types match on Apple Silicon.
-// This is not consistent across platforms, so types without explicit sizes should not be used.
-// The above types should be used instead.
-// _Static_assert(sizeof(unsigned short) == sizeof(U16));
-// _Static_assert(sizeof(short) == sizeof(I16));
-// _Static_assert(sizeof(unsigned int) == sizeof(U32));
-// _Static_assert(sizeof(int) == sizeof(I32));
-// _Static_assert(sizeof(unsigned long) == sizeof(U64));
-// _Static_assert(sizeof(long) == sizeof(I64));
-// _Static_assert(sizeof(unsigned long long) == sizeof(U64));
-// _Static_assert(sizeof(long long) == sizeof(I64));
+_Static_assert(sizeof(float) == sizeof(F32), "float must be 32 bits");
+_Static_assert(sizeof(double) == sizeof(F64), "double must be 64 bits");
+_Static_assert(sizeof(size_t) == sizeof(U64), "size_t must be 64 bits");
+_Static_assert(sizeof(ptrdiff_t) == sizeof(I64), "ptrdiff_t must be 64 bits");
+_Static_assert(sizeof(unsigned char) == sizeof(U8), "unsigned char must be 8 bits");
+_Static_assert(sizeof(char) == sizeof(I8), "char must be 8 bits");
 
 #define MIN(x, y) ((x) <= (y) ? (x) : (y))
 #define MAX(x, y) ((x) >= (y) ? (x) : (y))
@@ -201,7 +177,7 @@ struct Arena {
 // * We want this begin to be aligned to 16 bytes so common things like an array (which is always
 //   aligned to 16 bytes here) can be allocated at the start of the arena.
 // * Arena happens to be 4 pointers so this works well, static assert here to catch if that changes.
-_Static_assert(sizeof(Arena) % 16 == 0);
+_Static_assert(sizeof(Arena) % 16 == 0, "Arena size must be a multiple of 16 bytes");
 
 Arena *arena_new(void);
 void arena_reset(Arena *arena);
