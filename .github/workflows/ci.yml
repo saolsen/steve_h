@@ -2,117 +2,140 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
 
 jobs:
-  linux:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler: [ gcc, clang ]
-        include:
-          - compiler: gcc
-            cc: gcc
-            cxx: g++
-            c_flags: -std=c2x
-          - compiler: clang
-            cc: clang
-            cxx: clang++
-            c_flags: -std=c2x -fsanitize=address -fno-omit-frame-pointer
-
+  lint:
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out code
+        uses: actions/checkout@v3
 
-      - name: Setup compiler
-        run: |
-          echo "CC=${{ matrix.cc }}" >> $GITHUB_ENV
-          echo "CXX=${{ matrix.cxx }}" >> $GITHUB_ENV
+      - name: Deps (clang-format, clang-tidy)
+        run: sudo apt-get install -y clang-format clang-tidy
 
-      - name: Build and test
-        run: |
-          $CC --version
-          $CC -o test_steve test_steve.c ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
-          ./test_steve
+      - name: Run clang-format
+        run: clang-format -i test_steve.c
+        continue-on-error: true
 
-  macos:
-    runs-on: macos-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler: [ gcc, clang ]
-        include:
-          - compiler: gcc
-            cc: gcc
-            cxx: g++
-            c_flags: -std=c2x
-          - compiler: clang
-            cc: clang
-            cxx: clang++
-            c_flags: -std=c2x -fsanitize=address -fno-omit-frame-pointer
+      - name: Check for changes
+        run: git diff --exit-code
 
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup compiler
-        run: |
-          echo "CC=${{ matrix.cc }}" >> $GITHUB_ENV
-          echo "CXX=${{ matrix.cxx }}" >> $GITHUB_ENV
-
-      - name: Build and test
-        env:
-          MallocNanoZone: 0
-        run: |
-          $CC --version
-          $CC -o test_steve test_steve.c ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
-          ./test_steve
+      - name: Run clang-tidy
+        run: clang-tidy test_steve.c -- -std=c11 -Wall -Wextra -Werror -Wconversion
 
   windows:
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          #          - compiler: msvc
-          #            cc: cl
-          #            c_flags: /std:c23
-          - compiler: gcc
-            cc: gcc
-            c_flags: -std=gnu2x
-          - compiler: clang
-            cc: clang
-            c_flags: -std=c2x
-
+        compiler: [gcc, clang, msvc]
+        c_standard: [c11, c17]
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out code
+        uses: actions/checkout@v3
 
-      - name: Setup MSVC
+      - name: Deps (gcc)
+        if: matrix.compiler == 'gcc'
+        shell: powershell
+        run: choco install mingw --version=8.1.0 -y
+
+      - name: Deps (clang)
+        if: matrix.compiler == 'clang'
+        shell: powershell
+        run: choco install llvm -y
+
+      - name: Deps (msvc)
         if: matrix.compiler == 'msvc'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Set up MinGW
+      - name: Build and run (gcc)
         if: matrix.compiler == 'gcc'
-        uses: egor-tensin/setup-mingw@v2.2.0
-        with:
-          version: 12.2.0
+        env:
+          C_STANDARD: ${{ matrix.c_standard }}
+        run: |
+          gcc "-std=$Env:C_STANDARD" -Wall -Wextra -Werror -Wconversion test_steve.c -o test_steve.exe
+          .\test_steve.exe
 
-      - name: Setup LLVM
+      - name: Build and run (clang)
         if: matrix.compiler == 'clang'
-        uses: KyleMayes/install-llvm-action@v1
-        with:
-          version: "17.0"
+        env:
+          C_STANDARD: ${{ matrix.c_standard }}
+        run: |
+          clang "-std=$Env:C_STANDARD" -Wall -Wextra -Werror -Wconversion -fsanitize=address -fno-omit-frame-pointer test_steve.c -o test_steve.exe
+          .\test_steve.exe
 
-      - name: Build and test with MSVC
+      - name: Build and run (msvc)
         if: matrix.compiler == 'msvc'
+        shell: powershell
+        env:
+          CC: ${{ matrix.compiler }}
+          C_STANDARD: ${{ matrix.c_standard }}
         run: |
-          cl /Fe:test_steve.exe test_steve.c ${{ matrix.c_flags }} /W4 /WX
+          $msvcStdFlag = ""
+          switch ($Env:C_STANDARD) {
+            "c11" { $msvcStdFlag = "/std:c11" }
+            "c17" { $msvcStdFlag = "/std:c17" }
+          }
+
+          cl $msvcStdFlag test_steve.c /Fe:test_steve.exe
           .\test_steve.exe
 
-      - name: Build and test with GCC/Clang
-        if: matrix.compiler != 'msvc'
+  macos:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        c_standard: [c11, c17]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Deps (gcc)
+        if: matrix.compiler == 'gcc'
+        run: brew install -q gcc
+
+      - name: Build and run (gcc)
+        if: matrix.compiler == 'gcc'
         run: |
-          ${{ matrix.cc }} --version
-          ${{ matrix.cc }} -o test_steve.exe test_steve.c ${{ matrix.c_flags }} -Wall -Wextra -Werror -Wconversion
-          .\test_steve.exe
+          gcc-14 -std=${{ matrix.c_standard }} -Wall -Wextra -Werror -Wconversion test_steve.c -o test_steve
+          ./test_steve
+
+      - name: Build and run (clang)
+        if: matrix.compiler == 'clang'
+        env:
+          MallocNanoZone: 0
+        run: |
+          clang -std=${{ matrix.c_standard }} -Wall -Wextra -Werror -Wconversion -fsanitize=address -fno-omit-frame-pointer test_steve.c -o test_steve
+          ./test_steve
+
+  linux:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        c_standard: [c11, c17]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Deps (gcc)
+        if: matrix.compiler == 'gcc'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc
+
+      - name: Deps (clang)
+        if: matrix.compiler == 'clang'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+
+      - name: Build and run (gcc/clang)
+        run: |
+          ${{ matrix.compiler }} -std=${{ matrix.c_standard }} -Wall -Wextra -Werror -Wconversion -fsanitize=address -fno-omit-frame-pointer test_steve.c -o test_steve
+          ./test_steve
