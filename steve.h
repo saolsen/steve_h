@@ -81,7 +81,9 @@
 #define THREAD_LOCAL_STATIC _Thread_local static
 #define STATIC_ASSERT(exp) _Static_assert(exp, #exp)
 
-#ifdef _MSC_VER
+// This is a good way to check compilers and operating systems for
+// the things this lib supports.
+#if defined(_MSC_VER)
 // MSVC-specific code
 #elif defined(__GNUC__) || defined(__clang__)
 // GCC/Clang-specific code
