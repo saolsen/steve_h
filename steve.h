@@ -34,7 +34,7 @@
 //
 // Single header file library for C.
 // * Provides an arena allocator and some data structures that use it.
-// * Requires c11 or c23. Tested on gcc and clang on macos, linux and windows.
+// * Requires c11. Tested on gcc and clang on macos, linux and windows.
 //
 // * Arena for allocating memory.
 //   Since all allocations are backed by arenas you don't have to free anything individually, just
@@ -73,10 +73,31 @@
 
 #ifndef STEVE_H
 #define STEVE_H
-// NOLINTBEGIN(modernize-use-nullptr)
 
-#include <stddef.h>
+#include <assert.h>
+#include <stdbool.h>
 #include <stdint.h>
+
+#define THREAD_LOCAL_STATIC _Thread_local static
+#define STATIC_ASSERT(exp) _Static_assert(exp, #exp)
+
+#ifdef _MSC_VER
+// MSVC-specific code
+#elif defined(__GNUC__) || defined(__clang__)
+// GCC/Clang-specific code
+#else
+#error "Unsupported Compiler"
+#endif
+
+#if defined(_WIN64)
+// Windows-specific code
+#elif defined(__APPLE__)
+// macOS-specific code
+#elif defined(__linux__)
+// Linux-specific code
+#else
+#error "Unsupported Platform"
+#endif
 
 // @todo(steve): Clean up this block.
 // * Make it more obvious which compilers and c versions are supported.
@@ -99,6 +120,10 @@
 //     eg: STEVE_MACOS_CLANG_C23
 //   I can maybe look at other projects like sdl to see how they do this.
 
+// @todo(steve): mingw64 needs _Thread_local static
+
+#if 0
+
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202302L)
 #define STATIC_ASSERT(exp) static_assert(exp)
 #define THREAD_LOCAL_STATIC thread_local static
@@ -106,12 +131,14 @@
 #include <assert.h>
 #include <stdbool.h>
 #define STATIC_ASSERT(exp) _Static_assert(exp, #exp)
-#define THREAD_LOCAL_STATIC static __thread
+#define THREAD_LOCAL_STATIC _Thread_local static
 #elif defined(_MSC_VER)
 #define THREAD_LOCAL_STATIC __declspec(thread)
 #define STATIC_ASSERT(exp) static_assert(exp, #exp)
 #else
 #error "Unsupported Compiler"
+#endif
+
 #endif
 
 // Primitive types.
@@ -407,12 +434,10 @@ struct Pool {
 };
 #endif
 
-// NOLINTEND(modernize-use-nullptr)
+
 #endif // STEVE_H
 
 #ifdef STEVE_IMPLEMENTATION
-// NOLINTBEGIN(modernize-use-nullptr)
-// ReSharper disable CppNonInlineFunctionDefinitionInHeaderFile
 
 #include <assert.h>
 #include <stdarg.h>
@@ -780,11 +805,9 @@ StringSlice str_split(Arena *a, String s, char sep) {
     return result;
 }
 
-// NOLINTEND(modernize-use-nullptr)
 #endif // STEVE_IMPLEMENTATION
 
 #ifdef STEVE_TEST
-// NOLINTBEGIN(modernize-use-nullptr)
 
 static void test_helpers(void);
 static void test_arena_acquire_release(void);
@@ -1188,5 +1211,4 @@ static void test_strings(void) {
     arena_free(a);
 }
 
-// NOLINTEND(modernize-use-nullptr)
 #endif // STEVE_TEST
