@@ -121,27 +121,13 @@
 //     eg: STEVE_MACOS_CLANG_C23
 //   I can maybe look at other projects like sdl to see how they do this.
 
-// Primitive types.
-typedef uint8_t U8;
-typedef int8_t I8;
-typedef uint16_t U16;
-typedef int16_t I16;
-typedef uint32_t U32;
-typedef uint64_t U64;
-typedef int32_t I32;
-typedef int64_t I64;
-typedef float F32;
-typedef double F64;
-typedef size_t Size;
-typedef ptrdiff_t Offset;
-
 // Assert what these HAVE to be for the library to work.
-_Static_assert(sizeof(float) == sizeof(F32), "float must be 32 bits");
-_Static_assert(sizeof(double) == sizeof(F64), "double must be 64 bits");
-_Static_assert(sizeof(size_t) == sizeof(U64), "size_t must be 64 bits");
-_Static_assert(sizeof(ptrdiff_t) == sizeof(I64), "ptrdiff_t must be 64 bits");
-_Static_assert(sizeof(unsigned char) == sizeof(U8), "unsigned char must be 8 bits");
-_Static_assert(sizeof(char) == sizeof(I8), "char must be 8 bits");
+_Static_assert(sizeof(float) == 4, "float must be 32 bits");
+_Static_assert(sizeof(double) == 8, "double must be 64 bits");
+_Static_assert(sizeof(size_t) == 8, "size_t must be 64 bits");
+_Static_assert(sizeof(ptrdiff_t) == 8, "ptrdiff_t must be 64 bits");
+_Static_assert(sizeof(unsigned char) == 1, "unsigned char must be 8 bits");
+_Static_assert(sizeof(char) == 1, "char must be 8 bits");
 
 #define MIN(x, y) ((x) <= (y) ? (x) : (y))
 #define MAX(x, y) ((x) >= (y) ? (x) : (y))
@@ -150,14 +136,14 @@ _Static_assert(sizeof(char) == sizeof(I8), "char must be 8 bits");
 #define IS_POW2(x) (((x) != 0) && ((x) & ((x) - 1)) == 0)
 #define ALIGN_DOWN(n, a) ((n) & ~((a) - 1))
 #define ALIGN_UP(n, a) ALIGN_DOWN((n) + (a) - 1, (a))
-#define ALIGN_DOWN_PTR(p, a) ((void *)ALIGN_DOWN((Offset)(p), (a)))
-#define ALIGN_UP_PTR(p, a) ((void *)ALIGN_UP((Offset)(p), (a)))
+#define ALIGN_DOWN_PTR(p, a) ((void *)ALIGN_DOWN((ptrdiff_t)(p), (a)))
+#define ALIGN_UP_PTR(p, a) ((void *)ALIGN_UP((ptrdiff_t)(p), (a)))
 
-U64 pow2_next(U64 i);
+uint64_t pow2_next(uint64_t i);
 
 // memcpy wrapper so we don't have to include sting.h in the header.
 // @todo(steve): Tie in with future error handling.
-void *xmemcpy(void *dest, const void *src, Size n);
+void *xmemcpy(void *dest, const void *src, size_t n);
 
 // Arena
 // * An arena is a continuous block of memory that can grow up to a certain size.
@@ -167,10 +153,10 @@ void *xmemcpy(void *dest, const void *src, Size n);
 // * This only works on 64 bit systems where pointers are 64 bits.
 typedef struct Arena Arena;
 struct Arena {
-    U8 *begin;
-    U8 *pos;
-    U8 *commit;
-    U64 refcount;
+    uint8_t *begin;
+    uint8_t *pos;
+    uint8_t *commit;
+    uint64_t refcount;
 };
 // * The way an arena works is it allocates the big block of memory and starts allocations at
 //   begin + sizeof(Arena).
@@ -200,10 +186,10 @@ void scratch_release(void);
 void scratch_free();
 
 #define arena_alloc(arena, type) (type *)arena_alloc_size(arena, sizeof(type), _Alignof(type))
-U8 *arena_alloc_size(Arena *arena, Size size, Offset align);
+uint8_t *arena_alloc_size(Arena *arena, size_t size, ptrdiff_t align);
 
 // Get the size of the arena (not including the arena struct itself).
-Size arena_size(Arena *arena);
+size_t arena_size(Arena *arena);
 
 // You can copy and restore all the data in an area by copying the memory buffer.
 // This can be very powerful for cloning arbitrary data structures.
@@ -211,7 +197,7 @@ Size arena_size(Arena *arena);
 // can dedicate an arena to it and use arena_serialize and arena_deserialize to clone it.
 // Buf must have space for arena_size(arena) bytes.
 void arena_serialize(void *buf, Arena *arena);
-void arena_deserialize(Arena *arena, void *buf, Size size);
+void arena_deserialize(Arena *arena, void *buf, size_t size);
 // Note that dest comes first which matches the order arena_serialize and memcpy use.
 void arena_clone(Arena *dest, Arena *src);
 
@@ -220,34 +206,34 @@ void arena_clone(Arena *dest, Arena *src);
 // * If you store offsets instead of pointers in all the data structures in an arena, and they all
 //   only point to other things in the arena, you should use relative pointers if you want to take
 //   advantage of the arena_serialize and arena_deserialize.
-// * Since the type of the offset is always Offset you can't know what this is pointing at from
+// * Since the type of the offset is always ptrdiff_t you can't know what this is pointing at from
 //   the type.
 // * This is annoying, you have to know what it's pointing at from the context.
 //   @todo(steve): Is there a better way to do this in c that doesn't suck?
-#define rel(arena, ptr) ((Offset)(ptr) - (Offset)(arena)->begin)
-#define ptr(arena, off) (void *)((Offset)(arena)->begin + (off))
+#define rel(arena, ptr) ((ptrdiff_t)(ptr) - (ptrdiff_t)(arena)->begin)
+#define ptr(arena, off) (void *)((ptrdiff_t)(arena)->begin + (off))
 
 // Slice
 // * A slice is a pointer and a length. It's a view into an array.
 // * It's a polymorphic type so you typically typedef it to specific types.
-//     eg: typedef Slice(U8) U8Slice;
+//     eg: typedef Slice(uint8_t) uint8_tSlice;
 #define Slice(T)                                                                                   \
     struct {                                                                                       \
-        U64 len;                                                                                   \
+        uint64_t len;                                                                                   \
         T *e;                                                                                      \
     }
 
-typedef Slice(U8) U8Slice;
+typedef Slice(uint8_t) U8Slice;
 
 // * If the slice is a view into data on an arena, and it's stored in a data structure in the arena,
 //   it's better to store a relative slice so the arena can be serialized and deserialized.
-// * Since the type of the offset is always Offset you can't know what this is pointing at from
+// * Since the type of the offset is always ptrdiff_t you can't know what this is pointing at from
 //   the type.
 //   This is annoying, you have to know what it's pointing at from the context.
 //   @todo(steve): Is there a better way to do this in c that doesn't suck?
 typedef struct {
-    U64 len;
-    Offset e;
+    uint64_t len;
+    ptrdiff_t e;
 } RelSlice;
 
 #define slice_rel(arena, ptr_slice) {.len = (ptr_slice).len, .e = rel(arena, (ptr_slice).e)}
@@ -256,7 +242,7 @@ typedef struct {
 #define arena_clone_slice(arena, slice)                                                            \
     {.len = (slice).len,                                                                           \
      .e = (__typeof__((slice).e))arena__clone_slice(arena, (U8Slice *)&(slice), sizeof(*((slice).e)))}
-U8 *arena__clone_slice(Arena *arena, U8Slice *slice, Size item_size);
+uint8_t *arena__clone_slice(Arena *arena, U8Slice *slice, size_t item_size);
 
 // Array
 // * A dynamic array that grows as needed.
@@ -269,21 +255,21 @@ U8 *arena__clone_slice(Arena *arena, U8Slice *slice, Size item_size);
 //   on the arena using relative pointers.
 //   (of course if it reallocs it will move so you'll have to update the reference).
 // * It's a polymorphic type so you typically typedef it to specific types.
-//     eg: typedef Array(U8) U8Array;
+//     eg: typedef Array(uint8_t) uint8_tArray;
 // * Since the type is polymorphic, most of the helper functions are macros.
 #define Array(T)                                                                                   \
     struct {                                                                                       \
-        U64 len;                                                                                   \
-        U64 cap;                                                                                   \
+        uint64_t len;                                                                                   \
+        uint64_t cap;                                                                                   \
         T e[];                                                                                     \
     }
 
-typedef Array(U8) U8Array;
+typedef Array(uint8_t) U8Array;
 
 #define arena_alloc_array(arena, type, item_type, cap)                                             \
     (type *)arena__alloc_array(arena, sizeof(item_type), cap)
-U8Array *arena__alloc_array(Arena *arena, Size item_size, U64 cap);
-U8Array *arena__grow_array(Arena *arena, U8Array *array, Size item_size, U64 amount);
+U8Array *arena__alloc_array(Arena *arena, size_t item_size, uint64_t cap);
+U8Array *arena__grow_array(Arena *arena, U8Array *array, size_t item_size, uint64_t amount);
 
 #define arr_push(arena, array, val)                                                                \
     arr__maybegrow(arena, array, 1);                                                               \
@@ -315,7 +301,7 @@ U8Array *arena__grow_array(Arena *arena, U8Array *array, Size item_size, U64 amo
     do {                                                                                           \
         Arena *_arena = (arena);                                                                   \
         __typeof__(array) _array = (array);                                                        \
-        Size _n = (n);                                                                             \
+        size_t _n = (n);                                                                             \
         if (!_array || _array->len + _n > _array->cap) {                                           \
             _array = (__typeof__(_array))arena__grow_array(_arena, (U8Array *)_array,              \
                                                        sizeof(_array->e[0]), _n);                  \
@@ -325,7 +311,7 @@ U8Array *arena__grow_array(Arena *arena, U8Array *array, Size item_size, U64 amo
 
 #define arena_clone_arr(arena, array)                                                              \
     (__typeof__(array))arena__clone_arr(arena, (U8Array *)(array), sizeof((array)->e[0]))
-U8Array *arena__clone_arr(Arena *arena, U8Array *array, Size item_size);
+U8Array *arena__clone_arr(Arena *arena, U8Array *array, size_t item_size);
 
 // Notes on Array vs Slice
 // * An array contains the array data, so it's a buffer with metadata. The buffer is almost always
@@ -355,9 +341,9 @@ U8Array *arena__clone_arr(Arena *arena, U8Array *array, Size item_size);
 //   * It will allocate a new buffer in the arena with a null terminator.
 //     @opt(steve): Don't allocate if the String already has a null terminator.
 // * To get a String view of a c string, use the str macro.
-typedef Slice(U8) String;
+typedef Slice(uint8_t) String;
 
-#define str(c_string) ((String){.len = strlen(c_string), .e = (U8 *)c_string})
+#define str(c_string) ((String){.len = strlen(c_string), .e = (uint8_t *)c_string})
 #define cstr(a, s) arena__alloc_cstring((a), (s))
 
 typedef Array(String) StringArray;
@@ -365,31 +351,12 @@ typedef Slice(String) StringSlice;
 
 StringSlice str_split(Arena *a, String s, char sep);
 
-#if 0
-// Map
 // @todo(steve): hashmaps.
 // probably gonna base it on this either
 // * jon blow's hashmap: https://gist.github.com/saolsen/25e22c9ec7445acf1a60d484ea357355
 // * chris wellon's hashmap: https://nullprogram.com/blog/2023/09/30/
-
-// Interned Strings
 // @todo(steve): interned strings.
-
-
-// Pool
 // @todo(steve): pool.
-typedef struct Pool Pool;
-struct Pool {
-    Arena *arena;
-    Size len;
-    Size cap;
-    Size item_size;
-    U64 next_free_offset;
-    void *free_list;
-    uint8_t *data;
-};
-#endif
-
 
 #endif // STEVE_H
 
@@ -409,13 +376,13 @@ struct Pool {
 // todo(steve): For future msvc, can I set a pragma or whatever to link kernal32.lib?
 // #pragma comment(lib, "kernel32.lib")
 
-static Size memory__page_size(void) {
+static size_t memory__page_size(void) {
     SYSTEM_INFO sys_info;
     GetSystemInfo(&sys_info);
-    return (Size)sys_info.dwPageSize;
+    return sys_info.dwPageSize;
 }
 
-static U8 *memory__reserve(Size size) {
+static uint8_t *memory__reserve(size_t size) {
     void *r = VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_READWRITE);
     if (r == NULL) {
         // @todo(steve): Call GetLastError to get the error message.
@@ -425,7 +392,7 @@ static U8 *memory__reserve(Size size) {
     return r;
 }
 
-static void memory__commit(U8 *addr, Size size) {
+static void memory__commit(uint8_t *addr, size_t size) {
     // addr should be the start of a page and size should be a multiple of the page size.
     if (VirtualAlloc(addr, size, MEM_COMMIT, PAGE_READWRITE) == 0) {
         perror("memory__commit");
@@ -433,7 +400,7 @@ static void memory__commit(U8 *addr, Size size) {
     }
 }
 
-static void memory__free(U8 *addr) {
+static void memory__free(uint8_t *addr) {
     if (VirtualFree(addr, 0, MEM_RELEASE) == 0) {
         perror("memory__free");
         exit(1);
@@ -445,11 +412,11 @@ static void memory__free(U8 *addr) {
 #include <sys/mman.h>
 #include <unistd.h>
 
-static Size memory__page_size(void) {
-    return (Size)sysconf(_SC_PAGE_SIZE);
+static size_t memory__page_size(void) {
+    return (size_t)sysconf(_SC_PAGE_SIZE);
 }
 
-static U8 *memory__reserve(Size size) {
+static uint8_t *memory__reserve(size_t size) {
     void *addr = mmap(NULL, size, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (addr == MAP_FAILED) {
         perror("memory__reserve");
@@ -458,7 +425,7 @@ static U8 *memory__reserve(Size size) {
     return addr;
 }
 
-static void memory__commit(U8 *addr, Size size) {
+static void memory__commit(uint8_t *addr, size_t size) {
     // addr should be the start of a page and size should be a multiple of the page size.
     if (mprotect(addr, size, PROT_READ | PROT_WRITE) == -1) {
         perror("memory__commit");
@@ -466,8 +433,8 @@ static void memory__commit(U8 *addr, Size size) {
     }
 }
 
-static void memory__free(U8 *addr) {
-    Size pagesize = memory__page_size();
+static void memory__free(uint8_t *addr) {
+    size_t pagesize = memory__page_size();
     if (munmap(addr, pagesize * 4 * 1024 * 1024) == -1) {
         perror("munmap");
         exit(1);
@@ -482,7 +449,7 @@ static void memory__free(U8 *addr) {
 #endif
 #endif
 
-U64 pow2_next(U64 i) {
+uint64_t pow2_next(uint64_t i) {
     if (i == 0) {
         return 0;
     }
@@ -497,17 +464,17 @@ U64 pow2_next(U64 i) {
     return i;
 }
 
-void *xmemcpy(void *dest, const void *src, Size n) {
+void *xmemcpy(void *dest, const void *src, size_t n) {
     return memcpy(dest, src, n);
 }
 
 Arena *arena_new(void) {
     // Allocate a new arena.
-    Size pagesize = memory__page_size(); // 16kb on my machine.
-    Size cap =
+    size_t pagesize = memory__page_size(); // 16kb on my machine.
+    size_t cap =
         pagesize * 4 * 1024 * 1024; // 64GB on my machine. @note(steve): probably way too much
 
-    U8 *addr = memory__reserve(cap);
+    uint8_t *addr = memory__reserve(cap);
     memory__commit(addr, pagesize); // commit first page
 
 #if defined(__has_feature)
@@ -595,10 +562,10 @@ void scratch_free(void) {
     scratch__arena = NULL;
 }
 
-U8 *arena_alloc_size(Arena *arena, Size size, Offset align) {
+uint8_t *arena_alloc_size(Arena *arena, size_t size, ptrdiff_t align) {
     // Align Pointer
-    U8 *start = (U8 *)ALIGN_UP_PTR(arena->pos, align);
-    U8 *new_pos = start + size;
+    uint8_t *start = (uint8_t *)ALIGN_UP_PTR(arena->pos, align);
+    uint8_t *new_pos = start + size;
 
 #if defined(__has_feature)
 #if __has_feature(address_sanitizer)
@@ -608,12 +575,12 @@ U8 *arena_alloc_size(Arena *arena, Size size, Offset align) {
 
     // Commit new page if needed.
     if (new_pos > arena->commit) {
-        U8 *new_commit = arena->commit;
-        Size pagesize = memory__page_size();
+        uint8_t *new_commit = arena->commit;
+        size_t pagesize = memory__page_size();
         while (new_pos > new_commit) {
             new_commit += pagesize;
         }
-        memory__commit(arena->commit, (Size)(new_commit - arena->commit));
+        memory__commit(arena->commit, (size_t)(new_commit - arena->commit));
         arena->commit = new_commit;
     }
     arena->pos = new_pos;
@@ -629,10 +596,10 @@ U8 *arena_alloc_size(Arena *arena, Size size, Offset align) {
 
 // The size of the data in the arena. This is the size of buffer you would need to call
 // arena_serialize.
-Size arena_size(Arena *arena) {
-    Offset buf_span = arena->pos - arena->begin;
-    assert((Size)buf_span >= sizeof(Arena));
-    return (Size)buf_span - sizeof(Arena);
+size_t arena_size(Arena *arena) {
+    ptrdiff_t buf_span = arena->pos - arena->begin;
+    assert((size_t)buf_span >= sizeof(Arena));
+    return (size_t)buf_span - sizeof(Arena);
 }
 
 void arena_serialize(void *buf, Arena *arena) {
@@ -646,44 +613,44 @@ void arena_serialize(void *buf, Arena *arena) {
 
 // Note: This only works on an empty arena, if the arena passed in is not empty it will get reset.
 // @todo(steve): Return an error or something instead of just resetting the arena.
-void arena_deserialize(Arena *arena, void *buf, Size size) {
+void arena_deserialize(Arena *arena, void *buf, size_t size) {
     if (arena_size(arena) > 0) {
         perror("arena_deserialize: Arena is not empty. You must pass in an empty arena.");
         exit(1);
     }
-    U8 *data = arena_alloc_size(arena, size, 1);
+    uint8_t *data = arena_alloc_size(arena, size, 1);
     xmemcpy(data, buf, size);
 }
 
 void arena_clone(Arena *dest, Arena *src) {
-    Size size = arena_size(src);
+    size_t size = arena_size(src);
     arena_deserialize(dest, src->begin + sizeof(Arena), size);
 }
 
-U8 *arena__clone_slice(Arena *arena, U8Slice *slice, Size item_size) {
-    U8 *buf = arena_alloc_size(arena, slice->len * item_size, 16);
+uint8_t *arena__clone_slice(Arena *arena, U8Slice *slice, size_t item_size) {
+    uint8_t *buf = arena_alloc_size(arena, slice->len * item_size, 16);
     xmemcpy(buf, slice->e, slice->len * item_size);
     return buf;
 }
 
-U8Array *arena__alloc_array(Arena *arena, Size item_size, U64 cap) {
+U8Array *arena__alloc_array(Arena *arena, size_t item_size, uint64_t cap) {
     U8Array *array = (U8Array *)arena_alloc_size(arena, sizeof(U8Array) + (item_size * cap), 16);
     array->len = 0;
     array->cap = cap;
     return array;
 }
 
-U8Array *arena__grow_array(Arena *arena, U8Array *array, Size item_size, U64 amount) {
+U8Array *arena__grow_array(Arena *arena, U8Array *array, size_t item_size, uint64_t amount) {
     if (array == NULL) {
         return arena__alloc_array(arena, item_size, MAX(4, amount));
     }
-    Size new_cap = MAX(array->cap, 4);
+    size_t new_cap = MAX(array->cap, 4);
     while (MAX(array->cap, array->len) + amount > new_cap) {
         new_cap *= 2;
     }
     if (new_cap > array->cap) {
         // Grow the array
-        if (arena->pos == (U8 *)(array->e) + array->cap * item_size) {
+        if (arena->pos == (uint8_t *)(array->e) + array->cap * item_size) {
             // Array is on the end of the arena, we can just grow it.
             arena_alloc_size(arena, (new_cap - array->cap) * item_size, 1);
             array->cap = new_cap;
@@ -711,7 +678,7 @@ U8Array *arena__grow_array(Arena *arena, U8Array *array, Size item_size, U64 amo
     return array;
 }
 
-U8Array *arena__clone_arr(Arena *arena, U8Array *array, Size item_size) {
+U8Array *arena__clone_arr(Arena *arena, U8Array *array, size_t item_size) {
     U8Array *new_array = arena__alloc_array(arena, item_size, array->len);
     new_array->len = array->len;
     xmemcpy(new_array->e, array->e, new_array->len * item_size);
@@ -730,20 +697,20 @@ String format(Arena *a, const char *fmt, ...) {
     va_start(args, fmt);
     va_list args_copy;
     va_copy(args_copy, args);
-    Size len = (Size)vsnprintf(NULL, 0, fmt, args_copy);
+    size_t len = (size_t)vsnprintf(NULL, 0, fmt, args_copy);
     va_end(args_copy);
     char *c = (char *)arena_alloc_size(a, len + 1, _Alignof(char));
     vsnprintf(c, len + 1, fmt, args);
     va_end(args);
-    return (String){.len = len, .e = (U8 *)c};
+    return (String){.len = len, .e = (uint8_t *)c};
 }
 
 StringSlice str_split(Arena *a, String s, char sep) {
     // Skip leading separators.
-    U32 i = 0;
+    uint32_t i = 0;
     StringArray *parts = NULL;
     while (i < s.len) {
-        U32 start = i;
+        uint32_t start = i;
         while (i < s.len && s.e[i] != sep) {
             i++;
         }
@@ -840,12 +807,12 @@ static void test_helpers(void) {
     assert(ALIGN_DOWN(15, 8) == 8);
 
     {
-        Offset ptr_val = 15;
+        ptrdiff_t ptr_val = 15;
         void *p1 = (void *)ptr_val;
         void *aligned_up = ALIGN_UP_PTR(p1, 8);
         void *aligned_down = ALIGN_DOWN_PTR(p1, 8);
-        assert((Offset)aligned_up == 16);
-        assert((Offset)aligned_down == 8);
+        assert((ptrdiff_t)aligned_up == 16);
+        assert((ptrdiff_t)aligned_down == 8);
     }
 }
 
@@ -874,7 +841,7 @@ static void test_arena_acquire_release(void) {
 static void test_arena_reset(void) {
     Arena *a = arena_new();
     // Allocate some memory
-    I32 *x = arena_alloc(a, I32);
+    int *x = arena_alloc(a, int);
     *x = 42;
     assert(*x == 42);
 
@@ -883,7 +850,7 @@ static void test_arena_reset(void) {
     assert(arena_size(a) == 0);
 
     // Allocate again after reset
-    I32 *y = arena_alloc(a, I32);
+    int *y = arena_alloc(a, int);
     *y = 2025;
     assert(*y == 2025);
 
@@ -894,7 +861,7 @@ static void test_arena_reset(void) {
 
 static void test_arena_free(void) {
     Arena *a = arena_new();
-    I32 *x = arena_alloc(a, I32);
+    int *x = arena_alloc(a, int);
     *x = 123;
     arena_free(a);
 }
@@ -903,15 +870,15 @@ static void test_arena_alloc_alignment(void) {
     Arena *a = arena_new();
 
     // Test alignment for 1, 2, 4, 16
-    Offset alignments[] = {1, 2, 4, 16};
-    for (I32 i = 0; i < 4; i++) {
-        Offset align = alignments[i];
-        U8 *p = arena_alloc_size(a, 10, align);
-        assert(((Offset)p % align) == 0 && "Pointer must be aligned");
+    ptrdiff_t alignments[] = {1, 2, 4, 16};
+    for (int i = 0; i < 4; i++) {
+        ptrdiff_t align = alignments[i];
+        uint8_t *p = arena_alloc_size(a, 10, align);
+        assert(((ptrdiff_t)p % align) == 0 && "Pointer must be aligned");
     }
 
     // Cross page boundary test
-    Size pagesize = memory__page_size();
+    size_t pagesize = memory__page_size();
     (void)arena_alloc_size(a, pagesize + 1, 16);
 
     arena_free(a);
@@ -919,8 +886,8 @@ static void test_arena_alloc_alignment(void) {
 
 static void test_arena_large_alloc(void) {
     Arena *a = arena_new();
-    Size pagesize = memory__page_size();
-    Size big_size = pagesize * 5;
+    size_t pagesize = memory__page_size();
+    size_t big_size = pagesize * 5;
     void *big_block = arena_alloc_size(a, big_size, 16);
     assert(big_block != NULL);
     // Mke sure we can write to it.
@@ -931,10 +898,10 @@ static void test_arena_large_alloc(void) {
 
 static void test_rel_ptr(void) {
     Arena *a = arena_new();
-    I32 *x = arena_alloc(a, I32);
+    int *x = arena_alloc(a, int);
     *x = 55;
-    Offset offset = rel(a, x);
-    I32 *y = (I32 *)ptr(a, offset);
+    ptrdiff_t offset = rel(a, x);
+    int *y = (int *)ptr(a, offset);
     assert(x == y);
     assert(*y == 55);
 
@@ -945,17 +912,17 @@ static void test_slices(void) {
     Arena *a = arena_new();
 
     // Create an array
-    typedef Array(I32) I32Array;
+    typedef Array(int32_t) I32Array;
     I32Array *arr = NULL;
-    for (I32 i = 0; i < 5; i++) {
+    for (int32_t i = 0; i < 5; i++) {
         arr_push(a, arr, i * 10);
     }
 
     // Turn into slice
-    typedef Slice(I32) I32Slice;
+    typedef Slice(int32_t) I32Slice;
     I32Slice s = arr_slice(arr);
     assert(s.len == 5);
-    for (I32 i = 0; i < 5; i++) {
+    for (int32_t i = 0; i < 5; i++) {
         assert(s.e[i] == i * 10);
     }
 
@@ -963,7 +930,7 @@ static void test_slices(void) {
     Arena *a2 = arena_new();
     I32Slice clone = arena_clone_slice(a2, s);
     assert(clone.len == s.len);
-    for (I32 i = 0; i < 5; i++) {
+    for (int32_t i = 0; i < 5; i++) {
         assert(clone.e[i] == s.e[i]);
     }
     // Mutate original
@@ -979,17 +946,17 @@ static void test_rel_slices(void) {
     Arena *a = arena_new();
 
     // Create an array
-    typedef Array(I32) I32Array;
+    typedef Array(int32_t) I32Array;
     I32Array *arr = NULL;
-    for (I32 i = 0; i < 5; i++) {
+    for (int32_t i = 0; i < 5; i++) {
         arr_push(a, arr, i * 10);
     }
 
     // Turn into slice
-    typedef Slice(I32) I32Slice;
+    typedef Slice(int32_t) I32Slice;
     I32Slice s = arr_slice(arr);
     assert(s.len == 5);
-    for (I32 i = 0; i < 5; i++) {
+    for (int32_t i = 0; i < 5; i++) {
         assert(s.e[i] == i * 10);
     }
 
@@ -1000,7 +967,7 @@ static void test_rel_slices(void) {
     // Turn back into slice
     I32Slice s2 = slice_ptr(a, rs);
     assert(s2.len == 5);
-    for (I32 i = 0; i < 5; i++) {
+    for (int32_t i = 0; i < 5; i++) {
         assert(s2.e[i] == i * 10);
     }
 
@@ -1008,35 +975,35 @@ static void test_rel_slices(void) {
 }
 
 static void test_dynamic_arrays(void) {
-    typedef Array(I32) I32Array;
-    typedef Slice(I32) I32Slice;
+    typedef Array(int32_t) I32Array;
+    typedef Slice(int32_t) I32Slice;
 
     Arena *a = arena_new();
 
     // alloc_array
-    I32Array *arr = arena_alloc_array(a, I32Array, I32, 15);
+    I32Array *arr = arena_alloc_array(a, I32Array, int32_t, 15);
     assert(arr->len == 0);
     assert(arr->cap == 15);
 
     // Push elements
     arr = NULL;
-    for (I32 i = 0; i < 10; i++) {
+    for (int32_t i = 0; i < 10; i++) {
         arr_push(a, arr, i);
-        assert(arr->len == (U64)i + 1);
-        for (I32 j = 0; j <= i; j++) {
+        assert(arr->len == (uint64_t)i + 1);
+        for (int32_t j = 0; j <= i; j++) {
             assert(arr->e[j] == j);
         }
     }
 
     // Force reallocation
     // The library starts with capacity=4 if we push many items, we ensure multiple grows.
-    for (I32 i = 0; i < 100; i++) {
+    for (int32_t i = 0; i < 100; i++) {
         arr_push(a, arr, i + 100);
     }
     assert(arr->len == 110);
 
     // arr_push_slice
-    I32Slice slice = {.len = 3, .e = (I32[]){999, 1000, 1001}};
+    I32Slice slice = {.len = 3, .e = (int32_t[]){999, 1000, 1001}};
     arr_push_slice(a, arr, slice);
     assert(arr->len == 113);
     assert(arr->e[110] == 999);
@@ -1052,7 +1019,7 @@ static void test_dynamic_arrays(void) {
 
     // setlen
     // Length that puts us on a new page so that we know it worked if we can write to the end.
-    Size pagesize = memory__page_size();
+    size_t pagesize = memory__page_size();
     arr_setlen(a, arr, pagesize + 200);
     assert(arr->len == pagesize + 200);
     arr->e[pagesize + 199] = 1234;
@@ -1061,7 +1028,7 @@ static void test_dynamic_arrays(void) {
     Arena *a2 = arena_new();
     I32Array *clone = arena_clone_arr(a2, arr);
     assert(clone->len == arr->len);
-    for (U32 i = 0; i < arr->len; i++) {
+    for (uint32_t i = 0; i < arr->len; i++) {
         assert(clone->e[i] == arr->e[i]);
     }
 
@@ -1072,17 +1039,17 @@ static void test_dynamic_arrays(void) {
 static void test_arena_serialize(void) {
     // @todo(steve): Test relative pointers and relative slices here.
     Arena *a = arena_new();
-    typedef Array(I32) I32Array;
-    typedef Slice(I32) I32Slice;
+    typedef Array(int32_t) I32Array;
+    typedef Slice(int32_t) I32Slice;
     I32Array *arr = NULL;
-    for (I32 i = 0; i < 10; i++) {
+    for (int32_t i = 0; i < 10; i++) {
         arr_push(a, arr, i * 10);
     }
-    Offset arr_rel = rel(a, arr);
+    ptrdiff_t arr_rel = rel(a, arr);
     I32Slice s = arr_slice(arr);
     RelSlice s_rel = slice_rel(a, s);
 
-    Size size = arena_size(a);
+    size_t size = arena_size(a);
     void *buf = malloc(size);
     arena_serialize(buf, a);
 
@@ -1094,8 +1061,8 @@ static void test_arena_serialize(void) {
     I32Array *arr_copy = ptr(copy, arr_rel);
     I32Slice s_copy = slice_ptr(copy, s_rel);
     assert(arr_copy != arr);
-    assert((Offset)arr_copy >= (Offset)copy->begin);
-    assert((Offset)arr_copy <= (Offset)(copy->begin + size));
+    assert((ptrdiff_t)arr_copy >= (ptrdiff_t)copy->begin);
+    assert((ptrdiff_t)arr_copy <= (ptrdiff_t)(copy->begin + size));
     assert(s_copy.len == 10);
     assert(s_copy.e == arr_copy->e);
     assert(arr_copy->len == 10);
@@ -1110,8 +1077,8 @@ static void test_arena_serialize(void) {
     arr_copy = ptr(copy2, arr_rel);
     I32Slice s_copy2 = slice_ptr(copy2, s_rel);
     assert(arr_copy != arr);
-    assert((Offset)arr_copy >= (Offset)copy2->begin);
-    assert((Offset)arr_copy <= (Offset)(copy2->begin + size));
+    assert((ptrdiff_t)arr_copy >= (ptrdiff_t)copy2->begin);
+    assert((ptrdiff_t)arr_copy <= (ptrdiff_t)(copy2->begin + size));
     assert(s_copy2.len == 10);
     assert(s_copy2.e == arr_copy->e);
     assert(arr_copy->len == 10);
