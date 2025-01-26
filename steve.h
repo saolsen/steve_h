@@ -79,11 +79,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define THREAD_LOCAL_STATIC _Thread_local static
-#define STATIC_ASSERT(exp) _Static_assert(exp, #exp)
-
 // This is a good way to check compilers and operating systems for
-// the things this lib supports.
+// the things this lib supports. Everything used in the header is normal c11 so this isn't
+// needed here, but I keep it here as living docs.
+// A switch on the OS is used in the implementation file.
 #if defined(_MSC_VER)
 // MSVC-specific code
 #elif defined(__GNUC__) || defined(__clang__)
@@ -91,7 +90,6 @@
 #else
 #error "Unsupported Compiler"
 #endif
-
 #if defined(_WIN64)
 // Windows-specific code
 #elif defined(__APPLE__)
@@ -123,7 +121,6 @@
 //     eg: STEVE_MACOS_CLANG_C23
 //   I can maybe look at other projects like sdl to see how they do this.
 
-
 // Primitive types.
 typedef uint8_t U8;
 typedef int8_t I8;
@@ -139,36 +136,36 @@ typedef size_t Size;
 typedef ptrdiff_t Offset;
 
 // Assert what these HAVE to be for the library to work.
-STATIC_ASSERT(sizeof(float) == sizeof(F32));
-STATIC_ASSERT(sizeof(double) == sizeof(F64));
-STATIC_ASSERT(sizeof(Size) == sizeof(U64));
-STATIC_ASSERT(sizeof(Offset) == sizeof(I64));
-STATIC_ASSERT(sizeof(unsigned char) == sizeof(U8));
-STATIC_ASSERT(sizeof(char) == sizeof(I8));
-STATIC_ASSERT(sizeof(U8) == 1);
-STATIC_ASSERT(sizeof(I8) == 1);
-STATIC_ASSERT(sizeof(U16) == 2);
-STATIC_ASSERT(sizeof(I16) == 2);
-STATIC_ASSERT(sizeof(U32) == 4);
-STATIC_ASSERT(sizeof(I32) == 4);
-STATIC_ASSERT(sizeof(U64) == 8);
-STATIC_ASSERT(sizeof(I64) == 8);
-STATIC_ASSERT(sizeof(F32) == 4);
-STATIC_ASSERT(sizeof(F64) == 8);
-STATIC_ASSERT(sizeof(Size) == 8);
-STATIC_ASSERT(sizeof(Offset) == 8);
+_Static_assert(sizeof(float) == sizeof(F32));
+_Static_assert(sizeof(double) == sizeof(F64));
+_Static_assert(sizeof(Size) == sizeof(U64));
+_Static_assert(sizeof(Offset) == sizeof(I64));
+_Static_assert(sizeof(unsigned char) == sizeof(U8));
+_Static_assert(sizeof(char) == sizeof(I8));
+_Static_assert(sizeof(U8) == 1);
+_Static_assert(sizeof(I8) == 1);
+_Static_assert(sizeof(U16) == 2);
+_Static_assert(sizeof(I16) == 2);
+_Static_assert(sizeof(U32) == 4);
+_Static_assert(sizeof(I32) == 4);
+_Static_assert(sizeof(U64) == 8);
+_Static_assert(sizeof(I64) == 8);
+_Static_assert(sizeof(F32) == 4);
+_Static_assert(sizeof(F64) == 8);
+_Static_assert(sizeof(Size) == 8);
+_Static_assert(sizeof(Offset) == 8);
 
 // These asserts show how the other standard types match on Apple Silicon.
 // This is not consistent across platforms, so types without explicit sizes should not be used.
 // The above types should be used instead.
-// STATIC_ASSERT(sizeof(unsigned short) == sizeof(U16));
-// STATIC_ASSERT(sizeof(short) == sizeof(I16));
-// STATIC_ASSERT(sizeof(unsigned int) == sizeof(U32));
-// STATIC_ASSERT(sizeof(int) == sizeof(I32));
-// STATIC_ASSERT(sizeof(unsigned long) == sizeof(U64));
-// STATIC_ASSERT(sizeof(long) == sizeof(I64));
-// STATIC_ASSERT(sizeof(unsigned long long) == sizeof(U64));
-// STATIC_ASSERT(sizeof(long long) == sizeof(I64));
+// _Static_assert(sizeof(unsigned short) == sizeof(U16));
+// _Static_assert(sizeof(short) == sizeof(I16));
+// _Static_assert(sizeof(unsigned int) == sizeof(U32));
+// _Static_assert(sizeof(int) == sizeof(I32));
+// _Static_assert(sizeof(unsigned long) == sizeof(U64));
+// _Static_assert(sizeof(long) == sizeof(I64));
+// _Static_assert(sizeof(unsigned long long) == sizeof(U64));
+// _Static_assert(sizeof(long long) == sizeof(I64));
 
 #define MIN(x, y) ((x) <= (y) ? (x) : (y))
 #define MAX(x, y) ((x) >= (y) ? (x) : (y))
@@ -204,13 +201,13 @@ struct Arena {
 // * We want this begin to be aligned to 16 bytes so common things like an array (which is always
 //   aligned to 16 bytes here) can be allocated at the start of the arena.
 // * Arena happens to be 4 pointers so this works well, static assert here to catch if that changes.
-STATIC_ASSERT(sizeof(Arena) % 16 == 0);
+_Static_assert(sizeof(Arena) % 16 == 0);
 
 Arena *arena_new(void);
 void arena_reset(Arena *arena);
 void arena_free(Arena *arena);
 
-THREAD_LOCAL_STATIC Arena *scratch__arena = NULL;
+_Thread_local static Arena *scratch__arena = NULL;
 
 // Get a reference to the scratch arena.
 // There is a single scratch arena per thread.
