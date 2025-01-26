@@ -422,15 +422,15 @@ struct Pool {
 
 #ifdef STEVE_IMPLEMENTATION
 
-#include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef _WIN32
+#if defined(_WIN64)
+// Windows
 #include <Windows.h>
-
+// @note(steve): Must include Windows.h first.
 #include <Memoryapi.h>
 
 // todo(steve): For future msvc, can I set a pragma or whatever to link kernal32.lib?
@@ -468,6 +468,7 @@ static void memory__free(U8 *addr) {
 }
 
 #else
+// Posix
 #include <sys/mman.h>
 #include <unistd.h>
 
