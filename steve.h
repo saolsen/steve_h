@@ -76,6 +76,7 @@
 
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #define THREAD_LOCAL_STATIC _Thread_local static
